@@ -13,7 +13,7 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  final String _baseUrl = 'http://200.7.100.146/api-panaderia_nicol/mesas';
+  final String _baseUrl = 'http://200.7.100.146/api-panaderia_nicol/pos';
 
   @override
   void initState() {

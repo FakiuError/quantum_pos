@@ -1,210 +1,227 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:panaderia_nicol_pos/Widget/input.dart';
 import 'package:panaderia_nicol_pos/Services/Login_service.dart';
 import 'package:panaderia_nicol_pos/screens/mesas_screen.dart';
+import 'package:panaderia_nicol_pos/widgets/custom_window_bar.dart';
+
+const kPrimaryColor = Color(0xFFc0733d);
+const kOverlayDark = Color(0xFF1F140D);
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  const LoginScreen({super.key});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _usuarioController = TextEditingController();
-  final TextEditingController _contrasenaController = TextEditingController();
-  final LoginService _loginService = LoginService();
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
+  final _usuarioCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  final _loginService = LoginService();
 
-  bool _cargando = true;
+  late AnimationController _animController;
+  late Animation<double> _fadeAnim;
+
+  bool _cargando = false;
 
   @override
   void initState() {
     super.initState();
-    _verificarSesionGuardada();
-  }
 
-  Future<void> _verificarSesionGuardada() async {
-    final prefs = await SharedPreferences.getInstance();
-    final idUsuario = prefs.getInt('idUsuario');
-    if (idUsuario != null) {
-      //Navigator.pushReplacement(
-        //context,
-        //MaterialPageRoute(
-          //builder: (context) => MesasScreen(idUsuario: idUsuario),
-        //),
-      //);
-    } else {
-      setState(() => _cargando = false);
-    }
-  }
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
 
-  Future<void> _iniciarSesion() async {
-    final String usuario = _usuarioController.text.trim();
-    final String contrasena = _contrasenaController.text.trim();
+    _fadeAnim = CurvedAnimation(
+      parent: _animController,
+      curve: Curves.easeOut,
+    );
 
-    if (usuario.isEmpty || contrasena.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, complete todos los campos')),
-      );
-      return;
-    }
-
-    final Map<String, dynamic>? loginResult =
-    await _loginService.login(usuario, contrasena);
-
-    if (loginResult != null && loginResult['success'] == true) {
-      final int idUsuario = loginResult['id'];
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('idUsuario', idUsuario);
-      await prefs.setString('nombreUsuario', usuario);
-
-      //Navigator.pushReplacement(
-        //context,
-        //MaterialPageRoute(
-          //builder: (context) => MesasScreen(idUsuario: idUsuario),
-        //),
-      //);
-    } else {
-      String errorMessage =
-          loginResult?['message'] ?? 'Error desconocido al iniciar sesión.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorMessage)),
-      );
-    }
+    _animController.forward();
   }
 
   @override
   void dispose() {
-    _usuarioController.dispose();
-    _contrasenaController.dispose();
+    _usuarioCtrl.dispose();
+    _passCtrl.dispose();
+    _animController.dispose();
     super.dispose();
+  }
+
+  Future<void> _iniciarSesion() async {
+    if (_usuarioCtrl.text.isEmpty || _passCtrl.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Complete todos los campos")),
+      );
+      return;
+    }
+
+    setState(() => _cargando = true);
+
+    final result = await _loginService.login(
+      _usuarioCtrl.text.trim(),
+      _passCtrl.text.trim(),
+    );
+
+    setState(() => _cargando = false);
+
+    if (result != null && result['success'] == true) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('idUsuario', result['id']);
+
+      //Navigator.pushReplacement(
+        //context,
+        //MaterialPageRoute(
+          //builder: (_) => MesasScreen(idUsuario: result['id']),
+        //),
+      //);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result?['message'] ?? 'Error al iniciar sesión')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_cargando) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(color: Color(0xFFc0733d)),
-        ),
-      );
-    }
+    final width = MediaQuery.of(context).size.width;
 
-    final size = MediaQuery.of(context).size;
     return Scaffold(
-      body: SizedBox(
-        width: double.infinity,
-        height: double.infinity,
-        child: Stack(
-          children: [
-            SizedBox(
-              width: double.infinity,
-              height: size.height * 0.3,
-              child: Image.asset(
-                'assets/img/logo.png',
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        children: [
+          /// CONTENIDO PRINCIPAL
+          Stack(
+            fit: StackFit.expand,
+            children: [
+              /// IMAGEN DE FONDO
+              Image.asset(
+                'assets/img/pan_bg.jpg',
                 fit: BoxFit.cover,
               ),
-            ),
-            SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: size.height),
-                child: IntrinsicHeight(
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 250),
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        margin: const EdgeInsets.symmetric(horizontal: 30),
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(25),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black12,
-                              blurRadius: 15,
-                              offset: const Offset(0, 5),
-                            )
-                          ],
+
+              /// OVERLAY OSCURO
+              Container(
+                color: kOverlayDark.withOpacity(0.75),
+              ),
+
+              /// LOGIN
+              Center(
+                child: FadeTransition(
+                  opacity: _fadeAnim,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: width * 0.5 > 420 ? 420 : width * 0.9,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Image.asset(
+                          'assets/img/quantum_logo_blanco.png',
+                          height: 250,
                         ),
-                        child: Column(
-                          children: [
-                            const SizedBox(height: 10),
-                            Text("Ingresar",
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineLarge
-                                    ?.copyWith(fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 30),
-                            Form(
-                              child: Column(
-                                children: [
-                                  TextFormField(
-                                    controller: _usuarioController,
-                                    keyboardType: TextInputType.text,
-                                    autocorrect: false,
-                                    decoration:
-                                    InputDecoratios.inputDecoration(
-                                      hintext: "Ingrese el nombre de usuario",
-                                      labeltext: "Usuario",
-                                      icono: const Icon(
-                                          Icons.alternate_email_rounded,
-                                          color: Color(0xFFc0733d)),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 30),
-                                  TextFormField(
-                                    controller: _contrasenaController,
-                                    autocorrect: false,
-                                    obscureText: true,
-                                    decoration:
-                                    InputDecoratios.inputDecoration(
-                                      hintext: "*******",
-                                      labeltext: "Contraseña",
-                                      icono: const Icon(Icons.lock_outline,
-                                          color: Color(0xFFc0733d)),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 30),
-                                  MaterialButton(
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                        BorderRadius.circular(10)),
-                                    disabledColor: Colors.grey,
-                                    color: const Color(0xFFc0733d),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 80, vertical: 15),
-                                      child: const Text(
-                                        "Ingresar",
-                                        style: TextStyle(color: Colors.white),
-                                      ),
-                                    ),
-                                    onPressed: _iniciarSesion,
-                                  ),
-                                ],
+
+                        const SizedBox(height: 24),
+
+                        Text(
+                          "Diseñamos tecnología para que tú te enfoques en lo que realmente importa: las personas.",
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            color: Colors.white70,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+
+                        const SizedBox(height: 36),
+
+                        _input(
+                          controller: _usuarioCtrl,
+                          hint: "Usuario",
+                          icon: Icons.person_outline,
+                        ),
+                        const SizedBox(height: 16),
+                        _input(
+                          controller: _passCtrl,
+                          hint: "Contraseña",
+                          icon: Icons.lock_outline,
+                          obscure: true,
+                        ),
+
+                        const SizedBox(height: 26),
+
+                        SizedBox(
+                          width: double.infinity,
+                          height: 42,
+                          child: ElevatedButton(
+                            onPressed: _cargando ? null : _iniciarSesion,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: kPrimaryColor,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(24),
                               ),
                             ),
-                          ],
+                            child: _cargando
+                                ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                                : Text(
+                              "INICIAR SESIÓN",
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                color: Colors.white70,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                      const Spacer(),
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 25),
-                        child: Text(
-                          "Quantum Experience 2025",
-                          style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
+
+          /// BARRA SUPERIOR (SIEMPRE ARRIBA)
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: CustomWindowBar(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _input({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    bool obscure = false,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: obscure,
+      style: GoogleFonts.poppins(color: Colors.white),
+      decoration: InputDecoration(
+        prefixIcon: Icon(icon, color: Colors.white70),
+        hintText: hint,
+        hintStyle: GoogleFonts.poppins(color: Colors.white54),
+        filled: true,
+        fillColor: Colors.black.withOpacity(0.35),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(24),
+          borderSide: BorderSide.none,
         ),
       ),
     );

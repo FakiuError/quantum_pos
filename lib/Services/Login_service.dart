@@ -2,7 +2,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class LoginService {
-  final String _baseUrl = 'http://200.7.100.146/api-panaderia_nicol/mesas';
+  final String _baseUrl = 'http://200.7.100.146/api-panaderia_nicol/pos';
 
   Future<Map<String, dynamic>?> login(String username, String password) async {
     final Map<String, String> requestBody = {
