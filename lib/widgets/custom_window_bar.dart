@@ -32,7 +32,7 @@ class CustomWindowBar extends StatelessWidget {
                 children: [
                   /// 🧠 LOGO IZQUIERDA
                   Image.asset(
-                    'assets/img/quantum_logo_blanco.png',
+                    'assets/img/logo_quantum_blanco.png',
                     height: 20,
                   ),
 

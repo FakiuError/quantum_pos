@@ -6,6 +6,8 @@ import 'package:panaderia_nicol_pos/Services/Login_service.dart';
 import 'package:panaderia_nicol_pos/screens/mesas_screen.dart';
 import 'package:panaderia_nicol_pos/widgets/custom_window_bar.dart';
 
+import 'layout/main_layout.dart';
+
 const kPrimaryColor = Color(0xFFc0733d);
 const kOverlayDark = Color(0xFF1F140D);
 
@@ -69,22 +71,45 @@ class _LoginScreenState extends State<LoginScreen>
 
     setState(() => _cargando = false);
 
-    if (result != null && result['success'] == true) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('idUsuario', result['id']);
+    // 🔒 Validación defensiva
+    if (result == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No se recibió respuesta del servidor")),
+      );
+      return;
+    }
 
-      //Navigator.pushReplacement(
-        //context,
-        //MaterialPageRoute(
-          //builder: (_) => MesasScreen(idUsuario: result['id']),
-        //),
-      //);
+    if (result['success'] == true) {
+      final prefs = await SharedPreferences.getInstance();
+
+      final int idUsuario = result['id'];
+      final String nombreUsuario = result['nombre'];
+      final String rol = result['rol'];
+
+      await prefs.setInt('idUsuario', idUsuario);
+      await prefs.setString('nombreUsuario', nombreUsuario);
+      await prefs.setString('rol', rol);
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MainLayout(
+            rol: rol,
+            nombreUsuario: nombreUsuario,
+          ),
+        ),
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result?['message'] ?? 'Error al iniciar sesión')),
+        SnackBar(
+          content: Text(
+            result['message']?.toString() ?? 'Error al iniciar sesión',
+          ),
+        ),
       );
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
