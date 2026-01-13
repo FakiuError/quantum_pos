@@ -3,6 +3,7 @@ import 'custom_top_bar.dart';
 import 'sidebar.dart';
 import '../usuarios_screen.dart';
 import '../clientes_screen.dart';
+import '../mesas_screen.dart';
 
 class MainLayout extends StatefulWidget {
   final String rol;
@@ -94,6 +95,8 @@ class _MainLayoutState extends State<MainLayout> {
         return const UsuariosScreen();
       case 'clientes':
         return const ClientesScreen();
+      case 'mesas':
+        return const MesasScreen();
       default:
         return const Center(child: Text('Sección'));
     }

@@ -229,7 +229,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
           icon: const Icon(Icons.add),
-          label: const Text('Nuevo usuario'),
+          label: const Text('Nuevo cliente'),
           onPressed: () async {
             final creado = await showDialog(
               context: context,

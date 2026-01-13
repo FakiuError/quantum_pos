@@ -34,6 +34,7 @@ class Sidebar extends StatelessWidget {
           _item(Icons.inventory_2, 'Productos', 'productos'),
           _item(Icons.assignment_ind, 'Clientes', 'clientes'),
           _item(Icons.people, 'Usuarios', 'usuarios'),
+          _item(Icons.deck, 'Mesas', 'mesas'),
           _item(Icons.bar_chart, 'Reportes', 'reportes'),
 
           const Spacer(),
