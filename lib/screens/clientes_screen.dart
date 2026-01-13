@@ -1,27 +1,25 @@
 import 'package:flutter/material.dart';
-import 'package:panaderia_nicol_pos/Services/usuarios_service.dart';
-import 'package:panaderia_nicol_pos/screens/crear_usuario_dialog.dart';
+import 'package:panaderia_nicol_pos/Services/clientes_service.dart';
+import 'package:panaderia_nicol_pos/screens/crear_cliente_dialog.dart';
 
-class UsuariosScreen extends StatefulWidget {
-  const UsuariosScreen({super.key});
+class ClientesScreen extends StatefulWidget {
+  const ClientesScreen({super.key});
 
   @override
-  State<UsuariosScreen> createState() => _UsuariosScreenState();
+  State<ClientesScreen> createState() => _ClientesScreenState();
 }
 
-class _UsuariosScreenState extends State<UsuariosScreen> {
-  final UsuariosService _service = UsuariosService();
+class _ClientesScreenState extends State<ClientesScreen> {
+  final ClientesService _service = ClientesService();
   final TextEditingController _buscarCtrl = TextEditingController();
 
-  List<Map<String, dynamic>> _usuarios = [];
-  final Map<int, bool> _verPassword = {};
+  List<Map<String, dynamic>> _clientes = [];
 
   String _buscar = '';
-  String _rol = '';
-  String _estado = '';
+  String _estado = '1'; // activos por defecto
   String _orden = 'id';
   String _direccion = 'DESC';
-  bool _ascendente = false;
+
   int _paginaActual = 1;
   int _totalPaginas = 1;
   int _totalRegistros = 0;
@@ -29,13 +27,12 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
   @override
   void initState() {
     super.initState();
-    _cargarUsuarios();
+    _cargarClientes();
   }
 
-  Future<void> _cargarUsuarios() async {
-    final res = await _service.obtenerUsuarios(
+  Future<void> _cargarClientes() async {
+    final res = await _service.obtenerClientes(
       buscar: _buscar,
-      rol: _rol,
       estado: _estado,
       orden: _orden,
       direccion: _direccion,
@@ -43,19 +40,19 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
     );
 
     setState(() {
-      _usuarios = List<Map<String, dynamic>>.from(res['data']);
+      _clientes = List<Map<String, dynamic>>.from(res['data']);
       _totalRegistros = res['total'];
       _totalPaginas = res['totalPages'];
     });
   }
 
-  void _confirmarReactivar(Map<String, dynamic> usuario) {
+  void _confirmarReactivar(Map<String, dynamic> cliente) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Reactivar usuario'),
+        title: const Text('Reactivar cliente'),
         content: Text(
-          '¿Deseas reactivar al usuario "${usuario['nombre']}"?',
+          '¿Deseas reactivar al cliente "${cliente['nombre']}"?',
         ),
         actions: [
           TextButton(
@@ -69,7 +66,7 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
             onPressed: () {
               Navigator.pop(context);
-              _reactivarUsuario(usuario['id']);
+              _reactivarCliente(cliente['id']);
             },
             child: const Text('Reactivar'),
           ),
@@ -78,28 +75,27 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
     );
   }
 
-  Future<void> _reactivarUsuario(int id) async {
-    final ok = await _service.cambiarEstadoUsuario(id, 1);
-
+  Future<void> _reactivarCliente(int id) async {
+    final ok = await _service.cambiarEstadoCliente(id, 1);
     if (ok) {
       //ScaffoldMessenger.of(context).showSnackBar(
-        //const SnackBar(content: Text('Usuario reactivado')),
+      //const SnackBar(content: Text('Cliente reactivado')),
       //);
-      _cargarUsuarios();
+      _cargarClientes();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error al reactivar usuario')),
+        const SnackBar(content: Text('Error al reactivar cliente')),
       );
     }
   }
 
-  void _confirmarEliminar(Map<String, dynamic> usuario) {
+  void _confirmarEliminar(Map<String, dynamic> cliente) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Desactivar usuario'),
+        title: const Text('Desactivar cliente'),
         content: Text(
-          '¿Deseas desactivar al usuario "${usuario['nombre']}"?',
+          '¿Deseas desactivar al cliente "${cliente['nombre']}"?',
         ),
         actions: [
           TextButton(
@@ -113,7 +109,7 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
             onPressed: () {
               Navigator.pop(context);
-              _desactivarUsuario(usuario['id']);
+              _desactivarCliente(cliente['id']);
             },
             child: const Text('Desactivar'),
           ),
@@ -122,17 +118,17 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
     );
   }
 
-  Future<void> _desactivarUsuario(int id) async {
-    final ok = await _service.cambiarEstadoUsuario(id, 0);
+  Future<void> _desactivarCliente(int id) async {
+    final ok = await _service.cambiarEstadoCliente(id, 0);
 
     if (ok) {
       //ScaffoldMessenger.of(context).showSnackBar(
-        //const SnackBar(content: Text('Usuario desactivado')),
+      //const SnackBar(content: Text('Cliente desactivado')),
       //);
-      _cargarUsuarios();
+      _cargarClientes();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error al desactivar usuario')),
+        const SnackBar(content: Text('Error al desactivar cliente')),
       );
     }
   }
@@ -141,21 +137,12 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const CrearUsuarioDialog(),
+      builder: (_) => const CrearClienteDialog(),
     ).then((creado) {
       if (creado == true) {
-        _cargarUsuarios(); // refresca tabla
+        _cargarClientes(); // refresca tabla
       }
     });
-  }
-
-
-  void _toggleOrden() {
-    setState(() {
-      _ascendente = !_ascendente;
-      _direccion = _ascendente ? 'ASC' : 'DESC';
-    });
-    _cargarUsuarios();
   }
 
   @override
@@ -169,7 +156,7 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
           const SizedBox(height: 20),
           _buildTableHeader(),
           const Divider(height: 1),
-          Expanded(child: _buildUsuarios()),
+          Expanded(child: _buildClientes()),
           const Divider(height: 1),
           _buildPaginationBar(),
         ],
@@ -181,16 +168,16 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
   Widget _buildTopBar() {
     return Row(
       children: [
-        /// 🔍 BUSCAR
         Expanded(
           child: TextField(
             controller: _buscarCtrl,
-            onChanged: (value) {
-              _buscar = value;
-              _cargarUsuarios();
+            onChanged: (v) {
+              _buscar = v;
+              _paginaActual = 1;
+              _cargarClientes();
             },
             decoration: InputDecoration(
-              hintText: 'Buscar usuario...',
+              hintText: 'Buscar cliente...',
               prefixIcon: const Icon(Icons.search),
               filled: true,
               fillColor: Colors.white,
@@ -204,47 +191,23 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
 
         const SizedBox(width: 12),
 
-        /// 👤 ROL
         DropdownButton<String>(
-          value: _rol.isEmpty ? null : _rol,
-          hint: const Text('Rol'),
+          value: _estado,
           items: const [
-            DropdownMenuItem(
-              value: 'Administrador',
-              child: Text('Administrador'),
-            ),
-            DropdownMenuItem(value: 'Cajero', child: Text('Cajero')),
-            DropdownMenuItem(value: 'Mesero', child: Text('Mesero')),
+            DropdownMenuItem(value: '1', child: Text('Activos')),
+            DropdownMenuItem(value: '0', child: Text('Eliminados')),
           ],
           onChanged: (v) {
             setState(() {
-              _rol = v ?? '';
+              _estado = v!;
+              _paginaActual = 1;
             });
-            _cargarUsuarios();
+            _cargarClientes();
           },
         ),
 
         const SizedBox(width: 12),
 
-        /// 🔵 ESTADO
-        DropdownButton<String>(
-          value: _estado.isEmpty ? null : _estado,
-          hint: const Text('Estado'),
-          items: const [
-            DropdownMenuItem(value: '1', child: Text('Activo')),
-            DropdownMenuItem(value: '0', child: Text('Inactivo')),
-          ],
-          onChanged: (v) {
-            setState(() {
-              _estado = v ?? '';
-            });
-            _cargarUsuarios();
-          },
-        ),
-
-        const SizedBox(width: 12),
-
-        /// ⬆⬇ ORDEN
         IconButton(
           icon: Icon(
             _direccion == 'ASC' ? Icons.arrow_upward : Icons.arrow_downward,
@@ -254,11 +217,9 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
             setState(() {
               _direccion = _direccion == 'ASC' ? 'DESC' : 'ASC';
             });
-            _cargarUsuarios();
+            _cargarClientes();
           },
         ),
-
-        const SizedBox(width: 12),
 
         /// ➕ NUEVO
         ElevatedButton.icon(
@@ -272,11 +233,11 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
           onPressed: () async {
             final creado = await showDialog(
               context: context,
-              builder: (_) => const CrearUsuarioDialog(),
+              builder: (_) => const CrearClienteDialog(),
             );
 
             if (creado == true) {
-              _cargarUsuarios();
+              _cargarClientes();
             }
           },
         ),
@@ -289,10 +250,11 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
     return Row(
       children: const [
         _HeaderCell('Nombre'),
-        _HeaderCell('Usuario'),
-        _HeaderCell('Contraseña'),
+        _HeaderCell('Apellido'),
+        _HeaderCell('Identificación'),
         _HeaderCell('Teléfono'),
-        _HeaderCell('Rol'),
+        _HeaderCell('Correo'),
+        _HeaderCell('Deuda'),
         _HeaderCell('Estado'),
         SizedBox(width: 80),
       ],
@@ -300,108 +262,74 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
   }
 
   // ───────────────── LIST ─────────────────
-  Widget _buildUsuarios() {
-    if (_usuarios.isEmpty) {
-      return const Center(child: Text('No hay usuarios'));
+  Widget _buildClientes() {
+    if (_clientes.isEmpty) {
+      return const Center(child: Text('No hay clientes'));
     }
 
     return ListView.separated(
-      itemCount: _usuarios.length,
+      itemCount: _clientes.length,
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (_, i) {
-        final u = _usuarios[i];
-        final int id = u['id'];
-        final bool activo = u['estado'] == 1;
-        final bool verPass = _verPassword[id] ?? false;
+        final c = _clientes[i];
+        final activo = c['estado'] == 1;
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              _Cell(u['nombre']),
-              _Cell(u['usuario']),
+        String _val(String? v) =>
+            (v == null || v.trim().isEmpty) ? 'No tiene' : v;
 
-              /// ───────── CONTRASEÑA ─────────
-              Expanded(
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _verPassword[u['id']] = !(_verPassword[u['id']] ?? false);
-                      });
+        return Row(
+          children: [
+            _Cell(c['nombre']),
+            _Cell(c['apellido']),
+            _Cell(_val(c['identificacion'])),
+            _Cell(_val(c['telefono'])),
+            _Cell(_val(c['correo'])),
+            _Cell('\$${c['deuda']}'),
+            _Cell(
+              activo ? 'Activo' : 'Eliminado',
+              color: activo ? Colors.green : Colors.red,
+            ),
+            SizedBox(
+              width: 90,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit, size: 18, color: Colors.amber),
+                    onPressed: () async {
+                      final actualizado = await showDialog(
+                        context: context,
+                        builder: (_) => CrearClienteDialog(cliente: c),
+                      );
+
+                      if (actualizado == true) {
+                        _cargarClientes();
+                      }
                     },
-                    child: Text(
-                      (_verPassword[u['id']] ?? false)
-                          ? u['pass']
-                          : '••••••••',
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        letterSpacing: 1,
-                        color: Colors.grey.shade800,
-                      ),
-                    ),
                   ),
-                ),
-              ),
-
-              _Cell(
-                (u['telefono'] == null || u['telefono'].toString().trim().isEmpty)
-                    ? 'No tiene'
-                    : u['telefono'],
-                color: (u['telefono'] == null || u['telefono'].toString().trim().isEmpty)
-                    ? Colors.grey
-                    : null,
-              ),
-              _Cell(u['rol']),
-              _Cell(
-                activo ? 'Activo' : 'Inactivo',
-                color: activo ? Colors.green : Colors.red,
-              ),
-
-              /// ───────── ACCIONES ─────────
-              SizedBox(
-                width: 90,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit, size: 18, color: Colors.amber),
-                      onPressed: () async {
-                        final actualizado = await showDialog(
-                          context: context,
-                          builder: (_) => CrearUsuarioDialog(usuario: u),
-                        );
-
-                        if (actualizado == true) {
-                          _cargarUsuarios();
-                        }
-                      },
+                  IconButton(
+                    tooltip: activo
+                        ? 'Desactivar usuario'
+                        : 'Reactivar usuario',
+                    icon: Icon(
+                      activo ? Icons.delete : Icons.restore,
+                      size: 18,
+                      color: activo ? Colors.red : Colors.green,
                     ),
-                    IconButton(
-                      tooltip: activo
-                          ? 'Desactivar usuario'
-                          : 'Reactivar usuario',
-                      icon: Icon(
-                        activo ? Icons.delete : Icons.restore,
-                        size: 18,
-                        color: activo ? Colors.red : Colors.green,
-                      ),
-                      onPressed: () => activo
-                          ? _confirmarEliminar(u)
-                          : _confirmarReactivar(u),
-                    ),
-                  ],
-                ),
+                    onPressed: () => activo
+                        ? _confirmarEliminar(c)
+                        : _confirmarReactivar(c),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         );
       },
     );
   }
 
+  // ───────────────── PAGINATION ─────────────────
   Widget _buildPaginationBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -415,7 +343,7 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            'Mostrando ${_usuarios.length} de $_totalRegistros registros',
+            'Mostrando ${_clientes.length} de $_totalRegistros registros',
             style: const TextStyle(color: Colors.black54),
           ),
 
@@ -426,7 +354,7 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                 onPressed: _paginaActual > 1
                     ? () {
                   setState(() => _paginaActual--);
-                  _cargarUsuarios();
+                  _cargarClientes();
                 }
                     : null,
               ),
@@ -441,7 +369,7 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                 onPressed: _paginaActual < _totalPaginas
                     ? () {
                   setState(() => _paginaActual++);
-                  _cargarUsuarios();
+                  _cargarClientes();
                 }
                     : null,
               ),
@@ -451,29 +379,11 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
       ),
     );
   }
-
-  // ───────────────── HELPERS ─────────────────
-  Widget _dropdown({
-    required String value,
-    required String hint,
-    required List<String> items,
-    required Function(String?) onChanged,
-  }) {
-    return DropdownButton<String>(
-      value: value.isEmpty ? null : value,
-      hint: Text(hint),
-      items: items
-          .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-          .toList(),
-      onChanged: onChanged,
-    );
-  }
 }
 
 // ───────────────── CELLS ─────────────────
 class _HeaderCell extends StatelessWidget {
   final String text;
-
   const _HeaderCell(this.text);
 
   @override
@@ -490,7 +400,6 @@ class _HeaderCell extends StatelessWidget {
 class _Cell extends StatelessWidget {
   final String text;
   final Color? color;
-
   const _Cell(this.text, {this.color});
 
   @override

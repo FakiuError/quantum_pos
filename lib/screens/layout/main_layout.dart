@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'custom_top_bar.dart';
 import 'sidebar.dart';
 import '../usuarios_screen.dart';
+import '../clientes_screen.dart';
 
 class MainLayout extends StatefulWidget {
   final String rol;
@@ -91,6 +92,8 @@ class _MainLayoutState extends State<MainLayout> {
         return const Center(child: Text('Venta Rápida'));
       case 'usuarios':
         return const UsuariosScreen();
+      case 'clientes':
+        return const ClientesScreen();
       default:
         return const Center(child: Text('Sección'));
     }
