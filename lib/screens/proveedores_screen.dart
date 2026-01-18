@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:panaderia_nicol_pos/Services/clientes_service.dart';
-import 'package:panaderia_nicol_pos/screens/dialog/crear_cliente_dialog.dart';
+import 'package:panaderia_nicol_pos/Services/proveedores_service.dart';
+import 'package:panaderia_nicol_pos/screens/dialog/crear_proveedor_dialog.dart';
 
-class ClientesScreen extends StatefulWidget {
-  const ClientesScreen({super.key});
+class ProveedoresScreen extends StatefulWidget {
+  const ProveedoresScreen({super.key});
 
   @override
-  State<ClientesScreen> createState() => _ClientesScreenState();
+  State<ProveedoresScreen> createState() => _ProveedoresScreenState();
 }
 
-class _ClientesScreenState extends State<ClientesScreen> {
-  final ClientesService _service = ClientesService();
+class _ProveedoresScreenState extends State<ProveedoresScreen> {
+  final ProveedoresService _service = ProveedoresService();
   final TextEditingController _buscarCtrl = TextEditingController();
 
-  List<Map<String, dynamic>> _clientes = [];
+  List<Map<String, dynamic>> _proveedores = [];
 
   String _buscar = '';
   String _estado = '1'; // activos por defecto
@@ -27,11 +27,11 @@ class _ClientesScreenState extends State<ClientesScreen> {
   @override
   void initState() {
     super.initState();
-    _cargarClientes();
+    _cargarProveedores();
   }
 
-  Future<void> _cargarClientes() async {
-    final res = await _service.obtenerClientes(
+  Future<void> _cargarProveedores() async {
+    final res = await _service.obtenerProveedores(
       buscar: _buscar,
       estado: _estado,
       orden: _orden,
@@ -40,19 +40,19 @@ class _ClientesScreenState extends State<ClientesScreen> {
     );
 
     setState(() {
-      _clientes = List<Map<String, dynamic>>.from(res['data']);
+      _proveedores = List<Map<String, dynamic>>.from(res['data']);
       _totalRegistros = res['total'];
       _totalPaginas = res['totalPages'];
     });
   }
 
-  void _confirmarReactivar(Map<String, dynamic> cliente) {
+  void _confirmarReactivar(Map<String, dynamic> proveedor) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Reactivar cliente'),
+        title: const Text('Reactivar proveedor'),
         content: Text(
-          '¿Deseas reactivar al cliente "${cliente['nombre']}"?',
+          '¿Deseas reactivar al proveedor "${proveedor['razon']}"?',
         ),
         actions: [
           TextButton(
@@ -66,7 +66,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
             onPressed: () {
               Navigator.pop(context);
-              _reactivarCliente(cliente['id']);
+              _reactivarProveedor(proveedor['id']);
             },
             child: const Text('Reactivar'),
           ),
@@ -75,27 +75,27 @@ class _ClientesScreenState extends State<ClientesScreen> {
     );
   }
 
-  Future<void> _reactivarCliente(int id) async {
-    final ok = await _service.cambiarEstadoCliente(id, 1);
+  Future<void> _reactivarProveedor(int id) async {
+    final ok = await _service.cambiarEstadoProveedor(id, 1);
     if (ok) {
       //ScaffoldMessenger.of(context).showSnackBar(
-      //const SnackBar(content: Text('Cliente reactivado')),
+      //const SnackBar(content: Text('Proveedor reactivado')),
       //);
-      _cargarClientes();
+      _cargarProveedores();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error al reactivar cliente')),
+        const SnackBar(content: Text('Error al reactivar proveedor')),
       );
     }
   }
 
-  void _confirmarEliminar(Map<String, dynamic> cliente) {
+  void _confirmarEliminar(Map<String, dynamic> proveedor) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Desactivar cliente'),
+        title: const Text('Desactivar proveedor'),
         content: Text(
-          '¿Deseas desactivar al cliente "${cliente['nombre']}"?',
+          '¿Deseas desactivar al proveedor "${proveedor['razon']}"?',
         ),
         actions: [
           TextButton(
@@ -109,7 +109,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
             onPressed: () {
               Navigator.pop(context);
-              _desactivarCliente(cliente['id']);
+              _desactivarProveedor(proveedor['id']);
             },
             child: const Text('Desactivar'),
           ),
@@ -118,29 +118,29 @@ class _ClientesScreenState extends State<ClientesScreen> {
     );
   }
 
-  Future<void> _desactivarCliente(int id) async {
-    final ok = await _service.cambiarEstadoCliente(id, 0);
+  Future<void> _desactivarProveedor(int id) async {
+    final ok = await _service.cambiarEstadoProveedor(id, 0);
 
     if (ok) {
       //ScaffoldMessenger.of(context).showSnackBar(
-      //const SnackBar(content: Text('Cliente desactivado')),
+      //const SnackBar(content: Text('Proveedor desactivado')),
       //);
-      _cargarClientes();
+      _cargarProveedores();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error al desactivar cliente')),
+        const SnackBar(content: Text('Error al desactivar proveedor')),
       );
     }
   }
 
-  void _mostrarDialogCrearUsuario() {
+  void _mostrarDialogCrearProveedor() {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const CrearClienteDialog(),
+      builder: (_) => const CrearProveedorDialog(),
     ).then((creado) {
       if (creado == true) {
-        _cargarClientes(); // refresca tabla
+        _cargarProveedores();
       }
     });
   }
@@ -156,7 +156,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
           const SizedBox(height: 20),
           _buildTableHeader(),
           const Divider(height: 1),
-          Expanded(child: _buildClientes()),
+          Expanded(child: _buildProveedores()),
           const Divider(height: 1),
           _buildPaginationBar(),
         ],
@@ -174,10 +174,10 @@ class _ClientesScreenState extends State<ClientesScreen> {
             onChanged: (v) {
               _buscar = v;
               _paginaActual = 1;
-              _cargarClientes();
+              _cargarProveedores();
             },
             decoration: InputDecoration(
-              hintText: 'Buscar cliente...',
+              hintText: 'Buscar proveedor...',
               prefixIcon: const Icon(Icons.search),
               filled: true,
               fillColor: Colors.white,
@@ -202,7 +202,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
               _estado = v!;
               _paginaActual = 1;
             });
-            _cargarClientes();
+            _cargarProveedores();
           },
         ),
 
@@ -217,7 +217,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
             setState(() {
               _direccion = _direccion == 'ASC' ? 'DESC' : 'ASC';
             });
-            _cargarClientes();
+            _cargarProveedores();
           },
         ),
 
@@ -229,15 +229,15 @@ class _ClientesScreenState extends State<ClientesScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
           icon: const Icon(Icons.add),
-          label: const Text('Nuevo cliente'),
+          label: const Text('Nuevo proveedor'),
           onPressed: () async {
             final creado = await showDialog(
               context: context,
-              builder: (_) => const CrearClienteDialog(),
+              builder: (_) => const CrearProveedorDialog(),
             );
 
             if (creado == true) {
-              _cargarClientes();
+              _cargarProveedores();
             }
           },
         ),
@@ -251,10 +251,10 @@ class _ClientesScreenState extends State<ClientesScreen> {
       children: const [
         _HeaderCell('Nombre'),
         _HeaderCell('Apellido'),
-        _HeaderCell('Identificación'),
+        _HeaderCell('Razón'),
         _HeaderCell('Teléfono'),
         _HeaderCell('Correo'),
-        _HeaderCell('Deuda'),
+        _HeaderCell('Dirección'),
         _HeaderCell('Estado'),
         SizedBox(width: 80),
       ],
@@ -262,29 +262,29 @@ class _ClientesScreenState extends State<ClientesScreen> {
   }
 
   // ───────────────── LIST ─────────────────
-  Widget _buildClientes() {
-    if (_clientes.isEmpty) {
-      return const Center(child: Text('No hay clientes'));
+  Widget _buildProveedores() {
+    if (_proveedores.isEmpty) {
+      return const Center(child: Text('No hay proveedores'));
     }
 
     return ListView.separated(
-      itemCount: _clientes.length,
+      itemCount: _proveedores.length,
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (_, i) {
-        final c = _clientes[i];
-        final activo = c['estado'] == 1;
+        final p = _proveedores[i];
+        final activo = p['estado'] == 1;
 
         String _val(String? v) =>
             (v == null || v.trim().isEmpty) ? 'No tiene' : v;
 
         return Row(
           children: [
-            _Cell(c['nombre']),
-            _Cell(c['apellido']),
-            _Cell(_val(c['identificacion'])),
-            _Cell(_val(c['telefono'])),
-            _Cell(_val(c['correo'])),
-            _Cell('\$${c['deuda']}'),
+            _Cell(_val(p['nombre'])),
+            _Cell(_val(p['apellido'])),
+            _Cell(p['razon']),
+            _Cell(_val(p['telefono'])),
+            _Cell(_val(p['correo'])),
+            _Cell(_val(p['direccion'])),
             _Cell(
               activo ? 'Activo' : 'Eliminado',
               color: activo ? Colors.green : Colors.red,
@@ -299,26 +299,26 @@ class _ClientesScreenState extends State<ClientesScreen> {
                     onPressed: () async {
                       final actualizado = await showDialog(
                         context: context,
-                        builder: (_) => CrearClienteDialog(cliente: c),
+                        builder: (_) => CrearProveedorDialog(proveedor: p),
                       );
 
                       if (actualizado == true) {
-                        _cargarClientes();
+                        _cargarProveedores();
                       }
                     },
                   ),
                   IconButton(
                     tooltip: activo
-                        ? 'Desactivar usuario'
-                        : 'Reactivar usuario',
+                        ? 'Desactivar proveedor'
+                        : 'Reactivar proveedor',
                     icon: Icon(
                       activo ? Icons.delete : Icons.restore,
                       size: 18,
                       color: activo ? Colors.red : Colors.green,
                     ),
                     onPressed: () => activo
-                        ? _confirmarEliminar(c)
-                        : _confirmarReactivar(c),
+                        ? _confirmarEliminar(p)
+                        : _confirmarReactivar(p),
                   ),
                 ],
               ),
@@ -343,7 +343,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            'Mostrando ${_clientes.length} de $_totalRegistros registros',
+            'Mostrando ${_proveedores.length} de $_totalRegistros registros',
             style: const TextStyle(color: Colors.black54),
           ),
 
@@ -354,7 +354,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
                 onPressed: _paginaActual > 1
                     ? () {
                   setState(() => _paginaActual--);
-                  _cargarClientes();
+                  _cargarProveedores();
                 }
                     : null,
               ),
@@ -369,7 +369,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
                 onPressed: _paginaActual < _totalPaginas
                     ? () {
                   setState(() => _paginaActual++);
-                  _cargarClientes();
+                  _cargarProveedores();
                 }
                     : null,
               ),

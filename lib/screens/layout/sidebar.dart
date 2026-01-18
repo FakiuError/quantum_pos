@@ -32,6 +32,7 @@ class Sidebar extends StatelessWidget {
           _item(Icons.home, 'Home', 'dashboard'),
           _item(Icons.shopping_cart, 'Venta rápida', 'venta_rapida'),
           _item(Icons.inventory_2, 'Productos', 'productos'),
+          _item(Icons.local_shipping, 'Proveedores', 'proveedores'),
           _item(Icons.assignment_ind, 'Clientes', 'clientes'),
           _item(Icons.people, 'Usuarios', 'usuarios'),
           _item(Icons.deck, 'Mesas', 'mesas'),

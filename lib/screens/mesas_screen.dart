@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:panaderia_nicol_pos/Services/mesas_service.dart';
-import 'package:panaderia_nicol_pos/screens/crear_mesa_dialog.dart';
+import 'package:panaderia_nicol_pos/screens/dialog/crear_mesa_dialog.dart';
 
 class MesasScreen extends StatefulWidget {
   const MesasScreen({super.key});

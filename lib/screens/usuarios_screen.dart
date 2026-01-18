@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:panaderia_nicol_pos/Services/usuarios_service.dart';
-import 'package:panaderia_nicol_pos/screens/crear_usuario_dialog.dart';
+import 'package:panaderia_nicol_pos/screens/dialog/crear_usuario_dialog.dart';
 
 class UsuariosScreen extends StatefulWidget {
   const UsuariosScreen({super.key});
