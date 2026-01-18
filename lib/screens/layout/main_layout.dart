@@ -5,6 +5,7 @@ import '../usuarios_screen.dart';
 import '../clientes_screen.dart';
 import '../mesas_screen.dart';
 import '../proveedores_screen.dart';
+import '../categorias_screen.dart';
 
 class MainLayout extends StatefulWidget {
   final String rol;
@@ -92,6 +93,8 @@ class _MainLayoutState extends State<MainLayout> {
         return const Center(child: Text('Dashboard'));
       case 'venta_rapida':
         return const Center(child: Text('Venta Rápida'));
+      case 'categorias':
+        return const CategoriasScreen();
       case 'proveedores':
         return const ProveedoresScreen();
       case 'usuarios':
