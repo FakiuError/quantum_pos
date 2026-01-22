@@ -157,4 +157,22 @@ class ProductosService {
     return data['success'] == true;
   }
 
+  Future<Map<String, dynamic>?> obtenerProductoPorId(int id) async {
+    final res = await http.post(
+      Uri.parse('$_baseUrl/productos_obtener_por_id.php'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'id': id,
+      }),
+    );
+
+    final data = jsonDecode(res.body);
+
+    if (data['success'] == true && data['data'] != null) {
+      return Map<String, dynamic>.from(data['data']);
+    }
+
+    return null;
+  }
+
 }

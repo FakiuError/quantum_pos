@@ -30,7 +30,7 @@ class Sidebar extends StatelessWidget {
         children: [
           const SizedBox(height: 64),
           _item(Icons.home, 'Home', 'dashboard'),
-          _item(Icons.shopping_cart, 'Venta rápida', 'venta_rapida'),
+          _item(Icons.shopping_cart_checkout_outlined, 'Venta rápida', 'venta_rapida'),
           _item(Icons.fastfood_outlined, 'Productos', 'productos'),
           _item(Icons.widgets_outlined, 'Categorías', 'categorias'),
           _item(Icons.local_shipping, 'Proveedores', 'proveedores'),

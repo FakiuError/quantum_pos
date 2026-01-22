@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:panaderia_nicol_pos/screens/ventas_screen.dart';
 import 'custom_top_bar.dart';
 import 'sidebar.dart';
 import '../usuarios_screen.dart';
@@ -8,6 +9,7 @@ import '../proveedores_screen.dart';
 import '../categorias_screen.dart';
 import '../productos_screen.dart';
 import '../cajas_screen.dart';
+import '../ventas_screen.dart';
 
 class MainLayout extends StatefulWidget {
   final String rol;
@@ -94,7 +96,7 @@ class _MainLayoutState extends State<MainLayout> {
       case 'dashboard':
         return const Center(child: Text('Dashboard'));
       case 'venta_rapida':
-        return const Center(child: Text('Venta Rápida'));
+        return const VentasScreen(idUsuario: 1);
       case 'productos':
         return const ProductosScreen();
       case 'categorias':

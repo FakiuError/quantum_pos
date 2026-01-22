@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:panaderia_nicol_pos/screens/splash_screen.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:panaderia_nicol_pos/screens/core/custom_scroll_behavior.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,6 +29,7 @@ class MyApp extends StatelessWidget {
     return Directionality(
       textDirection: TextDirection.ltr,
       child: MaterialApp(
+        scrollBehavior: AppScrollBehavior(),
         debugShowCheckedModeBanner: false,
         title: 'Panaderia Nicol',
         routes: {
