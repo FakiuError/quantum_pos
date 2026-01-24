@@ -356,7 +356,6 @@ class _VentasScreenState extends State<VentasScreen> {
                     onPressed: (total <= 0 || !hayCajaActiva)
                         ? null
                         : () async {
-
                       final result = await showDialog<Map<String, dynamic>>(
                         context: context,
                         barrierDismissible: false,
@@ -383,6 +382,9 @@ class _VentasScreenState extends State<VentasScreen> {
 
                       final double totalFinal = total;
 
+                      // 📅 FECHA Y HORA DE LA FACTURA (SE CONGELA AQUÍ)
+                      final DateTime fechaHoraFactura = DateTime.now();
+
                       final response = await VentasService().registrarVenta(
                         cliente: cliente,
                         carrito: carrito,
@@ -399,12 +401,30 @@ class _VentasScreenState extends State<VentasScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                                response?['error'] ?? '❌ Error al registrar la venta'),
+                                response?['error'] ??
+                                    '❌ Error al registrar la venta'),
                             backgroundColor: Colors.red,
                           ),
                         );
                         return;
                       }
+
+                      // ───── NUMERO DE FACTURA SEGURO ─────
+                      int numeroFactura = 0;
+
+                      if (response['venta'] != null &&
+                          response['venta'] is Map &&
+                          response['venta']['id'] != null) {
+                        numeroFactura = response['venta']['id'];
+                      } else if (response['id_venta'] != null) {
+                        numeroFactura = response['id_venta'];
+                      }
+
+                      // 👤 NOMBRE DEL USUARIO QUE ATIENDE
+                      // 👉 Ajusta según cómo manejes usuarios
+                      final String usuarioAtiende =
+                          response['usuario']?['nombre'] ??
+                              'Usuario ${widget.idUsuario}';
 
                       if (response['caja'] != null) {
                         CajaActiva().actualizarDesdeBackend(
@@ -416,9 +436,19 @@ class _VentasScreenState extends State<VentasScreen> {
                         context: context,
                         barrierDismissible: false,
                         builder: (_) => DialogoVentaFinal(
+                          numeroFactura: numeroFactura,
+                          cliente:
+                          '${cliente['nombre']} ${cliente['apellido']}',
+                          identificacion:
+                          cliente['identificacion'] ?? 'N/A',
+                          usuario: usuarioAtiende,          // 👤 NUEVO
+                          fechaHora: fechaHoraFactura,      // 📅 NUEVO
+                          subtotal: subtotal,
+                          descuento: descuento,
                           total: totalFinal,
                           cambio: cambioCalculado,
-                          items: List<Map<String, dynamic>>.from(carrito),
+                          items:
+                          List<Map<String, dynamic>>.from(carrito),
                         ),
                       );
 
@@ -1303,15 +1333,32 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
 }
 
 class DialogoVentaFinal extends StatefulWidget {
+  final int numeroFactura;
+  final String cliente;
+  final String identificacion;
+
+  final double subtotal;
+  final double descuento;
   final double total;
   final double cambio;
+
+  final String usuario;
+  final DateTime fechaHora;
   final List<Map<String, dynamic>> items;
 
   const DialogoVentaFinal({
     super.key,
+    required this.numeroFactura,
+    required this.cliente,
+    required this.identificacion,
+    required this.subtotal,
+    required this.descuento,
     required this.total,
     required this.cambio,
     required this.items,
+    required this.usuario,
+    required this.fechaHora,
+
   });
 
   @override
@@ -1319,7 +1366,6 @@ class DialogoVentaFinal extends StatefulWidget {
 }
 
 class _DialogoVentaFinalState extends State<DialogoVentaFinal> {
-
   @override
   void initState() {
     super.initState();
@@ -1439,13 +1485,29 @@ class _DialogoVentaFinalState extends State<DialogoVentaFinal> {
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
                       onPressed: () async {
-                        await EscPosService.imprimirTicket(
-                          total: widget.total,
-                          cambio: widget.cambio,
-                          items: widget.items,
-                        );
+                        try {
+                          await EscPosService.imprimirTicket(
+                            numeroFactura: widget.numeroFactura,
+                            cliente: widget.cliente,
+                            identificacion: widget.identificacion,
+                            usuario: widget.usuario,              // ← NUEVO
+                            fechaHora: DateTime.now(),             // ← NUEVO
+                            subtotal: widget.subtotal,
+                            descuento: widget.descuento,
+                            total: widget.total,
+                            cambio: widget.cambio,
+                            items: widget.items,
+                          );
 
-                        Navigator.pop(context);
+                          Navigator.pop(context);
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('❌ ${e.toString()}'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
                       },
                       child: const Text(
                         'Sí',
