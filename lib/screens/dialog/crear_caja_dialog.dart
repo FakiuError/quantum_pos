@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:panaderia_nicol_pos/Services/cajas_service.dart';
+import 'package:panaderia_nicol_pos/screens/core/usuario_activo.dart';
 
 class CrearCajaDialog extends StatefulWidget {
   const CrearCajaDialog({Key? key}) : super(key: key);
@@ -10,7 +11,7 @@ class CrearCajaDialog extends StatefulWidget {
 
 class _CrearCajaDialogState extends State<CrearCajaDialog> {
   final _baseCtrl = TextEditingController(text: '0');
-  final _efectivoCtrl = TextEditingController(text: '0');
+  final _bancolombiaCtrl = TextEditingController(text: '0');
   final _nequiCtrl = TextEditingController(text: '0');
   final _daviplataCtrl = TextEditingController(text: '0');
   final _obsCtrl = TextEditingController();
@@ -22,11 +23,11 @@ class _CrearCajaDialogState extends State<CrearCajaDialog> {
     setState(() => _guardando = true);
 
     final ok = await _service.crearCaja(
-      idEmpleado: 1, // luego lo conectas al usuario logueado
+      idEmpleado: UsuarioActivo().id!, // ✅ CAMBIO CLAVE
       saldoBase: double.parse(_baseCtrl.text),
-      efectivo: double.parse(_efectivoCtrl.text),
       nequi: double.parse(_nequiCtrl.text),
       daviplata: double.parse(_daviplataCtrl.text),
+      bancolombia: double.parse(_bancolombiaCtrl.text),
       observaciones: _obsCtrl.text,
     );
 
@@ -47,7 +48,7 @@ class _CrearCajaDialogState extends State<CrearCajaDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             _input(_baseCtrl, 'Saldo base'),
-            _input(_efectivoCtrl, 'Efectivo inicial'),
+            _input(_bancolombiaCtrl, 'Bancolombia inicial'),
             _input(_nequiCtrl, 'Nequi inicial'),
             _input(_daviplataCtrl, 'Daviplata inicial'),
             _input(_obsCtrl, 'Observaciones'),

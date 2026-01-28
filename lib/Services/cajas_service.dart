@@ -16,9 +16,9 @@ class CajasService {
   Future<bool> crearCaja({
     required int idEmpleado,
     required double saldoBase,
-    required double efectivo,
     required double nequi,
     required double daviplata,
+    required double bancolombia,
     String observaciones = '',
   }) async {
     final res = await http.post(
@@ -27,9 +27,9 @@ class CajasService {
       body: jsonEncode({
         'id_empleado': idEmpleado,
         'saldo_base': saldoBase,
-        'efectivo': efectivo,
         'nequi': nequi,
         'daviplata': daviplata,
+        'bancolombia': bancolombia,
         'observaciones': observaciones,
       }),
     );

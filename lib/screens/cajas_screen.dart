@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:panaderia_nicol_pos/Services/cajas_service.dart';
 import 'package:panaderia_nicol_pos/screens/dialog/crear_caja_dialog.dart';
 import 'package:panaderia_nicol_pos/screens/core/caja_activa.dart';
+import 'package:panaderia_nicol_pos/screens/dialog/nuevo_gasto_dialog.dart';
 
 class CajasScreen extends StatefulWidget {
   const CajasScreen({Key? key}) : super(key: key);
@@ -113,24 +114,54 @@ class _CajasScreenState extends State<CajasScreen> {
           'Gestión de cajas',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
-        ElevatedButton.icon(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFc0733d),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          ),
-          icon: const Icon(Icons.add),
-          label: const Text('Nueva caja'),
-          onPressed: () async {
-            final creada = await showDialog(
-              context: context,
-              builder: (_) => const CrearCajaDialog(),
-            );
 
-            if (creada == true) {
-              _cargarCajas();
-            }
-          },
+        // 👉 BOTONES AGRUPADOS A LA DERECHA
+        Row(
+          children: [
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFc0733d),
+                foregroundColor: Colors.white,
+                padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+              icon: const Icon(Icons.price_check),
+              label: const Text('Cerrar Caja'),
+              onPressed: () async {
+                final creada = await showDialog(
+                  context: context,
+                  builder: (_) => const CrearCajaDialog(),
+                );
+
+                if (creada == true) {
+                  _cargarCajas();
+                }
+              },
+            ),
+
+            const SizedBox(width: 15), // 👈 espacio entre botones
+
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFc0733d),
+                foregroundColor: Colors.white,
+                padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+              icon: const Icon(Icons.add),
+              label: const Text('Nueva caja'),
+              onPressed: () async {
+                final creada = await showDialog(
+                  context: context,
+                  builder: (_) => const CrearCajaDialog(),
+                );
+
+                if (creada == true) {
+                  _cargarCajas();
+                }
+              },
+            ),
+          ],
         ),
       ],
     );
@@ -168,6 +199,7 @@ class _CajasScreenState extends State<CajasScreen> {
                 const SizedBox(height: 12),
                 _info('Base', c['saldo_base']),
                 _info('Efectivo', c['efectivo']),
+                _info('Bancolombia', c['bancolombia']),
                 _info('Nequi', c['nequi']),
                 _info('Daviplata', c['daviplata']),
               ],
@@ -186,6 +218,27 @@ class _CajasScreenState extends State<CajasScreen> {
                 children: [
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () async {
+                      final creado = await showDialog<bool>(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (_) => const NuevoGastoDialog(),
+                      );
+
+                      if (creado == true) {
+                        // Aquí actualizas lo que necesites
+                        // por ejemplo:
+                        setState(() {});
+                      }
+                    },
+                    child: const Text('Nuevo gasto'),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
                     ),
@@ -196,7 +249,7 @@ class _CajasScreenState extends State<CajasScreen> {
                     },
                     child: const Text('Activar'),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   if (_cajaSeleccionada != null)
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(

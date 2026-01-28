@@ -6,6 +6,7 @@ import 'package:panaderia_nicol_pos/Services/clientes_service.dart';
 import 'package:panaderia_nicol_pos/Services/ventas_service.dart';
 import 'package:panaderia_nicol_pos/screens/core/caja_activa.dart';
 import 'package:panaderia_nicol_pos/screens/core/esc_pos_service.dart';
+import 'package:panaderia_nicol_pos/screens/core/usuario_activo.dart';
 
 class VentasScreen extends StatefulWidget {
   final int idUsuario;
@@ -394,7 +395,7 @@ class _VentasScreenState extends State<VentasScreen> {
                         metodoPago: metodoPago,
                         pagaCon: pagaCon,
                         idCaja: CajaActiva().idCaja!,
-                        idEmpleado: widget.idUsuario,
+                        idEmpleado: UsuarioActivo().id!,
                       );
 
                       if (response == null || response['success'] != true) {
@@ -424,7 +425,7 @@ class _VentasScreenState extends State<VentasScreen> {
                       // 👉 Ajusta según cómo manejes usuarios
                       final String usuarioAtiende =
                           response['usuario']?['nombre'] ??
-                              'Usuario ${widget.idUsuario}';
+                              'Usuario ${UsuarioActivo().id!}';
 
                       if (response['caja'] != null) {
                         CajaActiva().actualizarDesdeBackend(
@@ -1212,16 +1213,16 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
   // ───────── MÉTODOS ─────────
   Widget _buildMetodosPago() {
     return GridView.count(
-      crossAxisCount: 4,
+      crossAxisCount: 5,
       shrinkWrap: true,
       crossAxisSpacing: 12,
       mainAxisSpacing: 12,
       physics: const NeverScrollableScrollPhysics(),
       children: [
         _metodoPagoCard('efectivo', 'Efectivo', Icons.payments),
+        _metodoPagoCard('bancolombia', 'Bancolombia', Icons.account_balance,),
         _metodoPagoCard('nequi', 'Nequi', Icons.phone_android),
-        _metodoPagoCard(
-            'daviplata', 'Daviplata', Icons.account_balance_wallet),
+        _metodoPagoCard('daviplata', 'Daviplata', Icons.account_balance_wallet),
         _metodoPagoCard('fiado', 'Fiado', Icons.schedule),
       ],
     );

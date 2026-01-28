@@ -15,8 +15,12 @@ class CajaActiva {
   bool get tieneCajaActiva => _caja != null;
 
   int? get idCaja => _caja?['id'];
+  int? get idEmpleado => _caja?['id_empleado'];
+
+  String? get nombreEmpleado => _caja?['empleado'];
 
   double get efectivo => (_caja?['efectivo'] ?? 0).toDouble();
+  double get bancolombia => (_caja?['bancolombia'] ?? 0).toDouble();
   double get nequi => (_caja?['nequi'] ?? 0).toDouble();
   double get daviplata => (_caja?['daviplata'] ?? 0).toDouble();
 
@@ -32,17 +36,19 @@ class CajaActiva {
     activar(caja);
   }
 
-  /// 🔄 ACTUALIZAR SALDOS EN TIEMPO REAL (POST-VENTA)
+  /// 🔄 ACTUALIZAR SALDOS EN TIEMPO REAL (POST-VENTA / GASTO)
   void actualizarSaldos({
     double? efectivo,
     double? nequi,
     double? daviplata,
+    double? bancolombia,
   }) {
     if (_caja == null) return;
 
     _caja = {
       ..._caja!,
       if (efectivo != null) 'efectivo': efectivo,
+      if (bancolombia != null) 'bancolombia': bancolombia,
       if (nequi != null) 'nequi': nequi,
       if (daviplata != null) 'daviplata': daviplata,
     };
