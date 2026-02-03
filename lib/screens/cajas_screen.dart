@@ -3,6 +3,8 @@ import 'package:panaderia_nicol_pos/Services/cajas_service.dart';
 import 'package:panaderia_nicol_pos/screens/dialog/crear_caja_dialog.dart';
 import 'package:panaderia_nicol_pos/screens/core/caja_activa.dart';
 import 'package:panaderia_nicol_pos/screens/dialog/nuevo_gasto_dialog.dart';
+import 'package:panaderia_nicol_pos/screens/core/usuario_activo.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class CajasScreen extends StatefulWidget {
   const CajasScreen({Key? key}) : super(key: key);
@@ -128,13 +130,40 @@ class _CajasScreenState extends State<CajasScreen> {
               icon: const Icon(Icons.price_check),
               label: const Text('Cerrar Caja'),
               onPressed: () async {
-                final creada = await showDialog(
-                  context: context,
-                  builder: (_) => const CrearCajaDialog(),
+                if (!CajaActiva().tieneCajaActiva) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('⚠️ Debes activar una caja antes de cerrarla'),
+                    ),
+                  );
+                  return;
+                }
+
+                final res = await CajasService().cerrarCaja(
+                  idCaja: CajaActiva().idCaja!,
+                  idEmpleado: UsuarioActivo().id!,
                 );
 
-                if (creada == true) {
-                  _cargarCajas();
+                if (res['success'] == true) {
+
+                  // 1️⃣ ABRIR PDF
+                  final url = Uri.parse(res['pdf']);
+                  if (await canLaunchUrl(url)) {
+                    await launchUrl(url, mode: LaunchMode.externalApplication);
+                  }
+
+                  // 2️⃣ LIMPIAR CAJA ACTIVA
+                  CajaActiva().limpiar();
+
+                  // 3️⃣ RECARGAR CAJAS ABIERTAS
+                  await _cargarCajas();
+
+                  // 4️⃣ ACTUALIZAR UI
+                  setState(() {});
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(res['error'] ?? 'Error al cerrar caja')),
+                  );
                 }
               },
             ),

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
 
 class CajasService {
@@ -47,5 +48,32 @@ class CajasService {
 
     final data = jsonDecode(res.body);
     return data['success'] == true;
+  }
+
+  Future<Map<String, dynamic>> cerrarCaja({
+    required int idCaja,
+    required int idEmpleado,
+  }) async {
+    final res = await http.post(
+      Uri.parse('$_baseUrl/caja_cerrar.php'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'id_caja': idCaja,
+        'id_empleado': idEmpleado,
+      }),
+    );
+
+    // 👇 DEBUG CLAVE
+    debugPrint('RESPUESTA RAW cerrarCaja: ${res.body}');
+
+    try {
+      return jsonDecode(res.body);
+    } catch (e) {
+      return {
+        'success': false,
+        'error': 'Respuesta inválida del servidor',
+        'raw': res.body,
+      };
+    }
   }
 }

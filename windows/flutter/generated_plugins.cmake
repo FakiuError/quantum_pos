@@ -6,6 +6,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   charset_converter
   file_selector_windows
   screen_retriever
+  url_launcher_windows
   window_manager
 )
 
