@@ -179,6 +179,11 @@ class _SalonScreenState extends State<SalonScreen> {
 
       int idPedido = res['pedido']['id'];
 
+      /// 🔥 ACTUALIZAR ESTADO LOCAL INMEDIATAMENTE
+      setState(() {
+        mesa['estado'] = 2;
+      });
+
       await Navigator.push(
         context,
         MaterialPageRoute(
@@ -190,16 +195,15 @@ class _SalonScreenState extends State<SalonScreen> {
         ),
       );
 
+      /// 🔄 Sincronizar después con backend
       _actualizarEstadoMesas();
 
     } else {
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text("Ir a facturación mesa ${mesa['nombre']}"),
         ),
       );
-
     }
   }
 
