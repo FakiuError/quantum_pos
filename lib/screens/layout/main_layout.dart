@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:panaderia_nicol_pos/screens/salon_screen.dart';
 import 'package:panaderia_nicol_pos/screens/ventas_screen.dart';
 import 'custom_top_bar.dart';
 import 'sidebar.dart';
@@ -95,8 +96,10 @@ class _MainLayoutState extends State<MainLayout> {
     switch (_currentSection) {
       case 'dashboard':
         return const Center(child: Text('Dashboard'));
+      case 'salon':
+        return const SalonScreen(idUsuario: 1,);
       case 'venta_rapida':
-        return const VentasScreen(idUsuario: 1);
+        return const VentasScreen(idUsuario: 1,);
       case 'productos':
         return const ProductosScreen();
       case 'categorias':

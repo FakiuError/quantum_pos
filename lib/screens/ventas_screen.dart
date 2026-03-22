@@ -13,7 +13,7 @@ class VentasScreen extends StatefulWidget {
 
   const VentasScreen({
     super.key,
-    required this.idUsuario,
+    required this.idUsuario
   });
 
   @override
