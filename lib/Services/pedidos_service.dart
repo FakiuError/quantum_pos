@@ -169,17 +169,30 @@ class PedidosService {
     return jsonDecode(response.body);
   }
 
-  /// OBTENER PEDIDOS ACTIVOS (estado 1 o 2)
+  /// OBTENER PEDIDOS ACTIVOS
   Future<Map<String, dynamic>?> obtenerPedidosActivos() async {
 
-    final url = Uri.parse('$_baseUrl/obtener_pedidos_activos.php');
+    final url = Uri.parse(
+        '$_baseUrl/obtener_pedidos_activos.php?ts=${DateTime.now().millisecondsSinceEpoch}'
+    );
 
-    final response = await http.get(url);
+    final response = await http.get(
+      url,
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+      },
+    );
 
     if (response.statusCode != 200) {
+      print("ERROR HTTP: ${response.statusCode}");
       return null;
     }
 
-    return jsonDecode(response.body);
+    final data = jsonDecode(response.body);
+
+    print("RESPUESTA PEDIDOS: $data"); // 🔥 DEBUG CLAVE
+
+    return data;
   }
 }

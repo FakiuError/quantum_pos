@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import '../Services/mesas_service.dart';
-import '../Services/pedidos_service.dart';
+import 'package:panaderia_nicol_pos/Services/mesas_service.dart';
+import 'package:panaderia_nicol_pos/Services/pedidos_service.dart';
 import 'pedidos_screen.dart';
 import 'package:panaderia_nicol_pos/screens/ventas_screen.dart';
 
@@ -37,7 +37,7 @@ class _SalonScreenState extends State<SalonScreen> {
     _cargarDatos();
 
     refresco = Timer.periodic(
-      const Duration(seconds:5),
+      const Duration(seconds:2), // 🔥 más rápido
           (timer){
         if(!mounted){
           timer.cancel();
@@ -79,29 +79,25 @@ class _SalonScreenState extends State<SalonScreen> {
 
     List pedidos = res['data'];
 
-    for(var mesa in mesas){
-      mesa['estado'] = 1;
-    }
-
-    for(var pedido in pedidos){
-
-      if(pedido['estado'] == 2){
-
-        for(var mesa in mesas){
-
-          if(mesa['id'] == pedido['id_mesa']){
-            mesa['estado'] = 2;
-          }
-
-        }
-
-      }
-
-    }
+    /// 🔥 Convertimos correctamente a int
+    Set<int> mesasOcupadas = pedidos
+        .where((p) => int.parse(p['estado'].toString()) == 2) // 🔥 FILTRO CLAVE
+        .map<int>((p) => int.parse(p['id_mesa'].toString()))
+        .toSet();
 
     if(!mounted) return;
 
-    setState(() {});
+    setState(() {
+
+      for(var mesa in mesas){
+
+        int idMesa = int.parse(mesa['id'].toString());
+
+        mesa['estado'] = mesasOcupadas.contains(idMesa) ? 2 : 1;
+
+      }
+
+    });
   }
 
   Future<void> _editarPedido(Map mesa) async {
@@ -127,23 +123,27 @@ class _SalonScreenState extends State<SalonScreen> {
       ),
     );
 
-    _actualizarEstadoMesas();
+    /// 🔥 IMPORTANTE: refrescar SIEMPRE
+    await _actualizarEstadoMesas();
   }
 
   Future<void> _abrirFacturacion(Map mesa) async {
     int idMesa = mesa['id'];
+
     final resPedido = await _pedidosService.obtenerPedidoMesa(
       idMesa: idMesa,
     );
     if (resPedido == null || resPedido['success'] != true) return;
 
     int idPedido = resPedido['pedido']['id'];
+
     final resDetalles = await _pedidosService.obtenerDetallesPedido(
       idPedido: idPedido,
     );
     if (resDetalles == null || resDetalles['success'] != true) return;
 
     final detalles = resDetalles['data'] ?? [];
+
     double total = 0;
     for (var d in detalles) {
       double precio = double.parse(d["precio"].toString());
@@ -157,6 +157,7 @@ class _SalonScreenState extends State<SalonScreen> {
         total: total,
       ),
     );
+
     if (result != null) {
       print("VENTA CONFIRMADA: $result");
     }
@@ -179,11 +180,6 @@ class _SalonScreenState extends State<SalonScreen> {
 
       int idPedido = res['pedido']['id'];
 
-      /// 🔥 ACTUALIZAR ESTADO LOCAL INMEDIATAMENTE
-      setState(() {
-        mesa['estado'] = 2;
-      });
-
       await Navigator.push(
         context,
         MaterialPageRoute(
@@ -195,15 +191,17 @@ class _SalonScreenState extends State<SalonScreen> {
         ),
       );
 
-      /// 🔄 Sincronizar después con backend
-      _actualizarEstadoMesas();
+      /// 🔥 IMPORTANTE: SIEMPRE refrescar al volver
+      await _actualizarEstadoMesas();
 
     } else {
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text("Ir a facturación mesa ${mesa['nombre']}"),
         ),
       );
+
     }
   }
 
@@ -229,6 +227,7 @@ class _SalonScreenState extends State<SalonScreen> {
       itemBuilder: (_,i){
 
         return MesaCard(
+          key: ValueKey(mesas[i]['id'].toString() + "_" + mesas[i]['estado'].toString()),
           mesa: mesas[i],
           onTap: _abrirMesa,
           onEdit: _editarPedido,
@@ -320,10 +319,8 @@ class _MesaCardState extends State<MesaCard>
       onTap: () {
 
         if(widget.mesa['estado'] == 2){
-          /// 🔴 MESA OCUPADA → FACTURAR
           widget.onFacturar(widget.mesa);
         } else {
-          /// 🟢 MESA LIBRE → ABRIR PEDIDO
           widget.onTap(widget.mesa);
         }
 
