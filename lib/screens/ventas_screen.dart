@@ -983,7 +983,7 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
 
     switch (metodoPago) {
       case 'efectivo':
-        return pagaCon >= widget.total;
+        return (pagaCon == 0 || pagaCon >= widget.total);
       case 'fiado':
         return _clienteSeleccionado != null &&
             _clienteSeleccionado!['id'] != 1;
@@ -1130,7 +1130,7 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
             Navigator.pop(context, {
               'cliente': _clienteSeleccionado,
               'metodo_pago': metodoPago,
-              'paga_con': pagaCon,
+              'paga_con': pagaCon > 0 ? pagaCon : widget.total,
             });
           }
               : null,
@@ -1261,11 +1261,17 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
           const SizedBox(height: 6),
           TextField(
             controller: _efectivoCtrl,
-            readOnly: true,
+            keyboardType: TextInputType.number,
+            autofocus: true,
             decoration: const InputDecoration(
               prefixText: '\$ ',
               border: OutlineInputBorder(),
             ),
+            onChanged: (value) {
+              setState(() {
+                pagaCon = double.tryParse(value) ?? 0;
+              });
+            },
           ),
           const SizedBox(height: 10),
           Text(
