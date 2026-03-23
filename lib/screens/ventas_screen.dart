@@ -7,6 +7,7 @@ import 'package:panaderia_nicol_pos/Services/ventas_service.dart';
 import 'package:panaderia_nicol_pos/screens/core/caja_activa.dart';
 import 'package:panaderia_nicol_pos/screens/core/esc_pos_service.dart';
 import 'package:panaderia_nicol_pos/screens/core/usuario_activo.dart';
+import 'package:panaderia_nicol_pos/widgets/productos_grid_widget.dart';
 
 class VentasScreen extends StatefulWidget {
   final int idUsuario;
@@ -90,12 +91,16 @@ class _VentasScreenState extends State<VentasScreen> {
 
   void _agregarProducto(Map<String, dynamic> p) {
     final i = carrito.indexWhere((e) => e['id'] == p['id']);
+
+    // 🔥 CONVERSIÓN SEGURA
+    final precio = double.tryParse(p['precio'].toString()) ?? 0;
+
     setState(() {
       if (i == -1) {
         carrito.add({
           'id': p['id'],
           'nombre': p['nombre'],
-          'precio': p['precio'],
+          'precio': precio, // ✅ YA ES double
           'cantidad': 1,
         });
       } else {
@@ -540,23 +545,8 @@ class _VentasScreenState extends State<VentasScreen> {
   // ───────────────── PRODUCTOS ─────────────────
 
   Widget _buildProductos() {
-    return Column(
-      children: [
-        Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.all(20),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 5,
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 16,
-              childAspectRatio: 0.9,
-            ),
-            itemCount: _productos.length,
-            itemBuilder: (_, i) => _productoCard(_productos[i]),
-          ),
-        ),
-        _buildCategorias(),
-      ],
+    return ProductosGridWidget(
+      onProductoSeleccionado: _agregarProducto,
     );
   }
 
