@@ -33,8 +33,17 @@ class EscPosService {
     final gen = Generator(PaperSize.mm80, profile);
 
     final bytes = <int>[];
+    final ByteData data = await rootBundle.load('assets/bin/logo_escpos.bin');
+    final Uint8List logoBytes = data.buffer.asUint8List();
+
+    bytes.addAll(logoBytes);
 
     // ───────── ENCABEZADO ─────────
+    bytes.addAll(gen.text(
+      ' ',
+      styles: const PosStyles(align: PosAlign.center),
+    ));
+
     bytes.addAll(gen.text(
       'PANADERIA NICOL',
       styles: const PosStyles(
@@ -42,6 +51,11 @@ class EscPosService {
         align: PosAlign.center,
         height: PosTextSize.size2,
       ),
+    ));
+
+    bytes.addAll(gen.text(
+      'NIT 39.629.075',
+      styles: const PosStyles(align: PosAlign.center),
     ));
 
     bytes.addAll(gen.text(
