@@ -5,6 +5,9 @@ import 'package:panaderia_nicol_pos/Services/mesas_service.dart';
 import 'package:panaderia_nicol_pos/Services/pedidos_service.dart';
 import 'pedidos_screen.dart';
 import 'package:panaderia_nicol_pos/screens/ventas_screen.dart';
+import 'package:panaderia_nicol_pos/Services/ventas_service.dart';
+import 'package:panaderia_nicol_pos/screens/core/caja_activa.dart';
+import 'package:panaderia_nicol_pos/screens/core/usuario_activo.dart';
 
 class SalonScreen extends StatefulWidget {
 
@@ -165,12 +168,75 @@ class _SalonScreenState extends State<SalonScreen> {
 
       print("VENTA CONFIRMADA: $result");
 
-      /// 🔥 FINALIZAR PEDIDO (estado = 3)
+      final cliente = Map<String, dynamic>.from(result['cliente']);
+      final String metodoPago = result['metodo_pago'];
+      final double pagaCon = (result['paga_con'] ?? total).toDouble();
+
+      final double cambio = metodoPago == 'efectivo'
+          ? (pagaCon - total)
+          : 0;
+
+      final DateTime fechaHora = DateTime.now();
+
+      /// 🔥 REGISTRAR VENTA (REUTILIZAS MISMO SERVICE)
+      final response = await VentasService().registrarVenta(
+        cliente: cliente,
+        carrito: List<Map<String, dynamic>>.from(detalles),
+        subtotal: total,
+        descuento: 0,
+        total: total,
+        metodoPago: metodoPago,
+        pagaCon: pagaCon,
+        idCaja: CajaActiva().idCaja!,
+        idEmpleado: UsuarioActivo().id!,
+      );
+
+      if (response == null || response['success'] != true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('❌ Error al registrar la venta'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      int numeroFactura = 0;
+
+      if (response['venta'] != null &&
+          response['venta']['id'] != null) {
+        numeroFactura = response['venta']['id'];
+      } else if (response['id_venta'] != null) {
+        numeroFactura = response['id_venta'];
+      }
+
+      final String usuario =
+          response['usuario']?['nombre'] ?? 'Usuario';
+
+      /// 🔥 AQUÍ REUTILIZAS TU DIÁLOGO (CLAVE)
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => DialogoVentaFinal(
+          numeroFactura: numeroFactura,
+          cliente: '${cliente['nombre']} ${cliente['apellido']}',
+          identificacion: cliente['identificacion'] ?? 'N/A',
+          usuario: UsuarioActivo().nombre!,
+          fechaHora: fechaHora,
+          subtotal: total,
+          descuento: 0,
+          total: total,
+          cambio: cambio,
+          items: List<Map<String, dynamic>>.from(detalles),
+        ),
+      );
+
+      /// 🔥 FINALIZAR PEDIDO (DESPUÉS DEL DIÁLOGO)
       await _pedidosService.finalizarPedido(
         idPedido: idPedido,
       );
 
-      /// 🔥 refrescar mesas
+      /// 🔥 REFRESCAR MESAS
       await _actualizarEstadoMesas();
     }
   }

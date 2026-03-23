@@ -442,7 +442,7 @@ class _VentasScreenState extends State<VentasScreen> {
                           '${cliente['nombre']} ${cliente['apellido']}',
                           identificacion:
                           cliente['identificacion'] ?? 'N/A',
-                          usuario: usuarioAtiende,          // 👤 NUEVO
+                          usuario: UsuarioActivo().nombre!,          // 👤 NUEVO
                           fechaHora: fechaHoraFactura,      // 📅 NUEVO
                           subtotal: subtotal,
                           descuento: descuento,
