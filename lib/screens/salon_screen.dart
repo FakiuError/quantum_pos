@@ -79,14 +79,14 @@ class _SalonScreenState extends State<SalonScreen> {
 
     List pedidos = res['data'];
 
-    /// 🔥 Convertimos correctamente a int
     Set<int> mesasOcupadas = pedidos
-        .where((p) => int.parse(p['estado'].toString()) == 2) // 🔥 FILTRO CLAVE
+        .where((p) => int.parse(p['estado'].toString()) == 2)
         .map<int>((p) => int.parse(p['id_mesa'].toString()))
         .toSet();
 
     if(!mounted) return;
 
+    /// 🔥 ACTUALIZAMOS UI
     setState(() {
 
       for(var mesa in mesas){
@@ -98,6 +98,9 @@ class _SalonScreenState extends State<SalonScreen> {
       }
 
     });
+
+    /// 🔥 SINCRONIZAMOS BD (MISMA LÓGICA)
+    await _mesasService.sincronizarEstadoMesas(mesas);
   }
 
   Future<void> _editarPedido(Map mesa) async {

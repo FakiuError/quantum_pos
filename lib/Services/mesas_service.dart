@@ -77,4 +77,20 @@ class MesasService {
     return data['success'] == true;
   }
    */
+
+  Future<void> sincronizarEstadoMesas(List<Map<String, dynamic>> mesas) async {
+
+    final url = Uri.parse('$_baseUrl/sync_mesas_estado.php');
+
+    await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'mesas': mesas.map((m) => {
+          'id': m['id'],
+          'estado': m['estado'],
+        }).toList(),
+      }),
+    );
+  }
 }
