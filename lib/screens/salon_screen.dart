@@ -159,7 +159,16 @@ class _SalonScreenState extends State<SalonScreen> {
     );
 
     if (result != null) {
+
       print("VENTA CONFIRMADA: $result");
+
+      /// 🔥 FINALIZAR PEDIDO (estado = 3)
+      await _pedidosService.finalizarPedido(
+        idPedido: idPedido,
+      );
+
+      /// 🔥 refrescar mesas
+      await _actualizarEstadoMesas();
     }
   }
 
