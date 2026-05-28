@@ -8,6 +8,7 @@ class VentasService {
     required List<Map<String, dynamic>> carrito,
     required double subtotal,
     required double descuento,
+    required double propina,
     required double total,
     required String metodoPago,
     required double pagaCon,
@@ -24,6 +25,7 @@ class VentasService {
         'carrito': carrito,
         'subtotal': subtotal,
         'descuento': descuento,
+        'propina': propina,
         'total': total,
         'metodoPago': metodoPago,
         'pagaCon': pagaCon,
@@ -35,6 +37,7 @@ class VentasService {
     if (response.statusCode != 200) {
       return null;
     }
+
     print(response.body);
     return jsonDecode(response.body);
   }

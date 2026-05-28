@@ -25,6 +25,7 @@ class EscPosService {
     required DateTime fechaHora,
     required double subtotal,
     required double descuento,
+    required double propina,
     required double total,
     required double cambio,
     required List<Map<String, dynamic>> items,
@@ -133,6 +134,10 @@ class EscPosService {
 
     if (descuento > 0) {
       bytes.addAll(gen.text('Descuento: -\$${descuento.toStringAsFixed(0)}'));
+    }
+
+    if (propina > 0) {
+      bytes.addAll(gen.text('Propina: \$${propina.toStringAsFixed(0)}'));
     }
 
     bytes.addAll(gen.text(

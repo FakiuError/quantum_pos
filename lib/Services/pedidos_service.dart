@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
 
 class PedidosService {
@@ -10,23 +12,55 @@ class PedidosService {
     required int idMesa,
     required int idEmpleado,
   }) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/crear_pedido.php');
 
-    final url = Uri.parse('$_baseUrl/crear_pedido.php');
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'idMesa': idMesa,
+          'idEmpleado': idEmpleado,
+        }),
+      ).timeout(
+        const Duration(seconds: 10),
+      );
 
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'idMesa': idMesa,
-        'idEmpleado': idEmpleado,
-      }),
-    );
+      if (response.statusCode != 200) {
+        debugPrint("❌ HTTP ${response.statusCode}: ${response.body}");
+        return {
+          'success': false,
+          'error': 'Error HTTP ${response.statusCode}',
+        };
+      }
 
-    if (response.statusCode != 200) {
-      return null;
+      final decoded = jsonDecode(response.body);
+
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+
+      return {
+        'success': false,
+        'error': 'Respuesta inválida del servidor',
+      };
+
+    } on TimeoutException {
+      debugPrint("⏱️ Timeout creando pedido");
+      return {
+        'success': false,
+        'error': 'Tiempo de espera agotado al crear el pedido',
+      };
+
+    } catch (e) {
+      debugPrint("❌ Error crearPedido: $e");
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
     }
-
-    return jsonDecode(response.body);
   }
 
   /// BUSCAR PEDIDO ACTIVO DE UNA MESA
@@ -76,31 +110,40 @@ class PedidosService {
   /// AGREGAR PRODUCTO AL PEDIDO
   Future<Map<String, dynamic>?> agregarProducto({
     required int idPedido,
+    int? idDetalle,
     int? idProducto,
     int? idPlatillo,
     required double cantidad,
     String comentario = '',
   }) async {
-
     final url = Uri.parse('$_baseUrl/agregar_detalle_pedido.php');
 
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'idPedido': idPedido,
-        'idProducto': idProducto,
-        'idPlatillo': idPlatillo,
-        'cantidad': cantidad,
-        'comentario': comentario,
-      }),
-    );
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'idPedido': idPedido,
+          'idDetalle': idDetalle,
+          'idProducto': idProducto,
+          'idPlatillo': idPlatillo,
+          'cantidad': cantidad,
+          'comentario': comentario,
+        }),
+      );
 
-    if (response.statusCode != 200) {
+      if (response.statusCode != 200) {
+        debugPrint(
+          "❌ Error agregarProducto ${response.statusCode}: ${response.body}",
+        );
+        return null;
+      }
+
+      return jsonDecode(response.body);
+    } catch (e) {
+      debugPrint("❌ Exception agregarProducto: $e");
       return null;
     }
-
-    return jsonDecode(response.body);
   }
 
   /// ELIMINAR DETALLE
@@ -171,28 +214,136 @@ class PedidosService {
 
   /// OBTENER PEDIDOS ACTIVOS
   Future<Map<String, dynamic>?> obtenerPedidosActivos() async {
+    try {
+      final uri = Uri.parse(
+        '$_baseUrl/obtener_pedidos_activos.php?ts=${DateTime.now().millisecondsSinceEpoch}',
+      );
 
-    final url = Uri.parse(
-        '$_baseUrl/obtener_pedidos_activos.php?ts=${DateTime.now().millisecondsSinceEpoch}'
-    );
+      final response = await http.get(uri).timeout(
+        const Duration(seconds: 8),
+      );
 
-    final response = await http.get(
-      url,
-      headers: {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-      },
-    );
+      if (response.statusCode != 200) {
+        debugPrint("❌ HTTP ${response.statusCode}: ${response.body}");
+        return null;
+      }
 
-    if (response.statusCode != 200) {
-      print("ERROR HTTP: ${response.statusCode}");
+      return jsonDecode(response.body);
+
+    } on TimeoutException {
+      debugPrint("⏱️ Timeout obteniendo pedidos activos");
+      return null;
+
+    } catch (e) {
+      debugPrint("❌ Error obtenerPedidosActivos: $e");
       return null;
     }
+  }
 
-    final data = jsonDecode(response.body);
+  Future<Map<String, dynamic>?> cambiarMesaPedido({
+    required int idPedido,
+    required int idMesaOrigen,
+    required int idMesaDestino,
+  }) async {
+    try {
+      final url = Uri.parse("$_baseUrl/cambiar_mesa_pedido.php");
 
-    print("RESPUESTA PEDIDOS: $data"); // 🔥 DEBUG CLAVE
+      debugPrint("========== CAMBIAR MESA PEDIDO ==========");
+      debugPrint("URL: $url");
+      debugPrint("ID PEDIDO: $idPedido");
+      debugPrint("ID MESA ORIGEN: $idMesaOrigen");
+      debugPrint("ID MESA DESTINO: $idMesaDestino");
 
-    return data;
+      final response = await http.post(
+        url,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({
+          "id_pedido": idPedido,
+          "id_mesa_origen": idMesaOrigen,
+          "id_mesa_destino": idMesaDestino,
+        }),
+      );
+
+      debugPrint("STATUS CODE: ${response.statusCode}");
+      debugPrint("BODY RESPONSE: ${response.body}");
+      debugPrint("========================================");
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+
+      return {
+        "success": false,
+        "error": "Error HTTP ${response.statusCode}: ${response.body}",
+      };
+    } catch (e) {
+      debugPrint("ERROR cambiarMesaPedido: $e");
+
+      return {
+        "success": false,
+        "error": "Error cambiando mesa: $e",
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>?> cambiarEstadoPedidoYProductos({
+    required int idPedido,
+    required int idMesa,
+    required int estado,
+  }) async {
+    try {
+      final url = Uri.parse("$_baseUrl/cambiar_estado_pedido_productos.php");
+
+      debugPrint("========== CAMBIAR ESTADO PEDIDO ==========");
+      debugPrint("URL: $url");
+      debugPrint("ID PEDIDO: $idPedido");
+      debugPrint("ID MESA: $idMesa");
+      debugPrint("ESTADO: $estado");
+
+      final response = await http.post(
+        url,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({
+          "id_pedido": idPedido,
+          "id_mesa": idMesa,
+          "estado": estado,
+        }),
+      );
+
+      debugPrint("STATUS CODE: ${response.statusCode}");
+      debugPrint("BODY RESPONSE: ${response.body}");
+      debugPrint("===========================================");
+
+      if (response.body.isEmpty) {
+        return {
+          "success": false,
+          "error": "Respuesta vacía del servidor. HTTP ${response.statusCode}",
+        };
+      }
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return data;
+      }
+
+      return {
+        "success": false,
+        "error": data["error"] ??
+            data["message"] ??
+            "Error HTTP ${response.statusCode}",
+      };
+    } catch (e) {
+      debugPrint("ERROR cambiarEstadoPedidoYProductos: $e");
+
+      return {
+        "success": false,
+        "error": "Error cambiando estado del pedido: $e",
+      };
+    }
   }
 }

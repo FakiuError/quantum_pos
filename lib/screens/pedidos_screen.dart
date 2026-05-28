@@ -3,7 +3,6 @@ import '../services/pedidos_service.dart';
 import '../widgets/productos_grid_widget.dart';
 
 class PedidoScreen extends StatefulWidget {
-
   final int idMesa;
   final int idPedido;
   final int idEmpleado;
@@ -20,302 +19,357 @@ class PedidoScreen extends StatefulWidget {
 }
 
 class _PedidoScreenState extends State<PedidoScreen> {
-
   final PedidosService _pedidosService = PedidosService();
 
   bool cargando = true;
-
   List<Map<String, dynamic>> carrito = [];
-
-  /// ============================
-  /// INIT
-  /// ============================
 
   @override
   void initState() {
     super.initState();
-    _cargarPedido();
+    _cargarPedido(mostrarCarga: true);
   }
 
-  /// ============================
-  /// CARGAR PEDIDO EXISTENTE (CORREGIDO)
-  /// ============================
+  int _toInt(dynamic value, {int defaultValue = 0}) {
+    if (value == null) return defaultValue;
+    if (value is int) return value;
+    return int.tryParse(value.toString()) ?? defaultValue;
+  }
 
-  Future<void> _cargarPedido() async {
+  double _toDouble(dynamic value, {double defaultValue = 0}) {
+    if (value == null) return defaultValue;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    return double.tryParse(value.toString()) ?? defaultValue;
+  }
+
+  bool _estaFinalizado(Map<String, dynamic> item) {
+    return _toInt(item["estado"], defaultValue: 2) == 3;
+  }
+
+  String _textoEstado(Map<String, dynamic> item) {
+    final estado = _toInt(item["estado"], defaultValue: 2);
+
+    if (estado == 3) return "Finalizado";
+    if (estado == 2) return "En preparación";
+
+    return "Pendiente";
+  }
+
+  Color _colorEstado(Map<String, dynamic> item) {
+    final estado = _toInt(item["estado"], defaultValue: 2);
+
+    if (estado == 3) return Colors.blueGrey;
+    if (estado == 2) return Colors.orange.shade700;
+
+    return Colors.grey;
+  }
+
+  Future<void> _cargarPedido({bool mostrarCarga = false}) async {
+    if (mostrarCarga && mounted) {
+      setState(() {
+        cargando = true;
+      });
+    }
 
     final res = await _pedidosService.obtenerDetallesPedido(
       idPedido: widget.idPedido,
     );
 
-    print("DETALLES PEDIDO: $res"); // DEBUG
+    List<Map<String, dynamic>> nuevoCarrito = [];
 
     if (res != null && res['success'] == true) {
-
-      final detalles = res['data']; // 🔥 IMPORTANTE
+      final detalles = res['data'];
 
       if (detalles != null && detalles is List) {
-
-        carrito = detalles.map<Map<String, dynamic>>((d) {
-
+        nuevoCarrito = detalles.map<Map<String, dynamic>>((d) {
           return {
             "idDetalle": d["id"],
             "id_producto": d["id_producto"],
-            "nombre": d["nombre"],
-            "precio": double.parse(d["precio"].toString()),
-            "cantidad": double.parse(d["cantidad"].toString()),
+            "id_platillo": d["id_platillo"],
+            "nombre": d["nombre"] ?? "",
+            "precio": _toDouble(d["precio"]),
+            "cantidad": _toDouble(d["cantidad"]),
             "comentario": d["comentario"] ?? "",
+            "estado": _toInt(d["estado"], defaultValue: 2),
           };
-
         }).toList();
-
-      } else {
-        carrito = [];
       }
-
-    } else {
-      carrito = [];
     }
 
-    if(!mounted) return;
+    if (!mounted) return;
 
     setState(() {
+      carrito = nuevoCarrito;
       cargando = false;
     });
-
   }
 
-  /// ============================
-  /// AGREGAR PRODUCTO
-  /// ============================
+  Future<void> _mostrarError(String mensaje) async {
+    if (!mounted) return;
 
-  Future agregarProducto(producto) async {
-
-    final index = carrito.indexWhere(
-          (item) => item["id_producto"] == producto["id"],
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(mensaje),
+        backgroundColor: Colors.red,
+      ),
     );
+  }
 
-    setState(() {
-
-      if (index != -1) {
-        carrito[index]["cantidad"]++;
-      } else {
-        carrito.add({
-          "id_producto": producto["id"],
-          "nombre": producto["nombre"],
-          "precio": double.parse(producto["precio"].toString()),
-          "cantidad": 1,
-          "comentario": "",
-        });
-      }
-
-    });
-
-    await _pedidosService.agregarProducto(
+  Future<void> agregarProducto(producto) async {
+    final res = await _pedidosService.agregarProducto(
       idPedido: widget.idPedido,
-      idProducto: producto["id"],
+      idProducto: _toInt(producto["id"]),
       cantidad: 1,
     );
+
+    if (res == null || res['success'] != true) {
+      await _mostrarError(
+        res?["message"]?.toString() ??
+            res?["error"]?.toString() ??
+            "No se pudo agregar el producto al pedido",
+      );
+      return;
+    }
+
+    await _cargarPedido();
   }
 
-  /// ============================
-  /// TOTAL
-  /// ============================
-
   double calcularTotal() {
-
     double total = 0;
 
     for (var item in carrito) {
-      total += item["precio"] * item["cantidad"];
+      total += _toDouble(item["precio"]) * _toDouble(item["cantidad"]);
     }
 
     return total;
   }
 
-  /// ============================
-  /// CONFIRMAR
-  /// ============================
-
-  Future confirmarPedido() async {
-
+  Future<void> confirmarPedido() async {
     final res = await _pedidosService.confirmarPedido(
       idPedido: widget.idPedido,
     );
 
-    if (res != null && res['success']) {
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Pedido confirmado")),
-      );
-
+    if (res != null && res['success'] == true) {
+      if (!mounted) return;
       Navigator.pop(context, true);
     }
   }
 
-  /// ============================
-  /// UI RESUMEN
-  /// ============================
-
   Widget resumenPedido() {
-
     return Column(
       children: [
-
-        /// LISTA
         Expanded(
           child: ListView.builder(
             itemCount: carrito.length,
             itemBuilder: (context, index) {
-
               final item = carrito[index];
+              final bool finalizado = _estaFinalizado(item);
+              final int? idDetalle = item["idDetalle"] == null
+                  ? null
+                  : _toInt(item["idDetalle"]);
 
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                color: finalizado ? Colors.grey.shade100 : Colors.white,
                 child: Padding(
                   padding: const EdgeInsets.all(8),
                   child: Column(
                     children: [
-
-                      /// HEADER
                       Row(
                         children: [
-
                           Expanded(
                             child: Text(
                               item["nombre"],
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _colorEstado(item).withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              _textoEstado(item),
+                              style: TextStyle(
+                                color: _colorEstado(item),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
 
                           IconButton(
                             icon: const Icon(Icons.delete, color: Colors.red),
                             onPressed: () async {
-
-                              if(item["idDetalle"] != null){
-                                await _pedidosService.eliminarDetalle(
-                                  idDetalle: item["idDetalle"],
+                              if (idDetalle != null && idDetalle > 0) {
+                                final res = await _pedidosService.eliminarDetalle(
+                                  idDetalle: idDetalle,
                                 );
+
+                                if (res == null || res['success'] != true) {
+                                  await _mostrarError(
+                                    res?["message"]?.toString() ??
+                                        res?["error"]?.toString() ??
+                                        "No se pudo eliminar el detalle",
+                                  );
+                                  return;
+                                }
                               }
 
-                              setState(() {
-                                carrito.removeAt(index);
-                              });
+                              await _cargarPedido();
                             },
-                          )
+                          ),
                         ],
                       ),
 
-                      /// CONTROLES
                       Row(
                         children: [
-
                           IconButton(
                             icon: const Icon(Icons.remove),
-                            onPressed: () async {
+                            onPressed: finalizado
+                                ? () async {
+                              await _mostrarError(
+                                "No puedes disminuir un producto que ya fue finalizado por cocina.",
+                              );
+                            }
+                                : () async {
+                              final res = await _pedidosService.agregarProducto(
+                                idPedido: widget.idPedido,
+                                idDetalle: idDetalle,
+                                idProducto: item["id_producto"] == null
+                                    ? null
+                                    : _toInt(item["id_producto"]),
+                                idPlatillo: item["id_platillo"] == null
+                                    ? null
+                                    : _toInt(item["id_platillo"]),
+                                cantidad: -1,
+                              );
 
-                              if(item["cantidad"] > 1){
-
-                                setState(() {
-                                  item["cantidad"]--;
-                                });
-
-                                await _pedidosService.agregarProducto(
-                                  idPedido: widget.idPedido,
-                                  idProducto: item["id_producto"],
-                                  cantidad: -1,
+                              if (res == null || res['success'] != true) {
+                                await _mostrarError(
+                                  res?["message"]?.toString() ??
+                                      res?["error"]?.toString() ??
+                                      "No se pudo disminuir la cantidad",
                                 );
-
-                              } else {
-
-                                if(item["idDetalle"] != null){
-                                  await _pedidosService.eliminarDetalle(
-                                    idDetalle: item["idDetalle"],
-                                  );
-                                }
-
-                                setState(() {
-                                  carrito.removeAt(index);
-                                });
-
+                                return;
                               }
 
+                              await _cargarPedido();
                             },
                           ),
 
                           Text(
-                            item["cantidad"].toString(),
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                            _toDouble(item["cantidad"]).toStringAsFixed(
+                              _toDouble(item["cantidad"]) % 1 == 0 ? 0 : 2,
+                            ),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
 
                           IconButton(
                             icon: const Icon(Icons.add),
                             onPressed: () async {
-
-                              setState(() {
-                                item["cantidad"]++;
-                              });
-
-                              await _pedidosService.agregarProducto(
+                              final res = await _pedidosService.agregarProducto(
                                 idPedido: widget.idPedido,
-                                idProducto: item["id_producto"],
+                                idDetalle: idDetalle,
+                                idProducto: item["id_producto"] == null
+                                    ? null
+                                    : _toInt(item["id_producto"]),
+                                idPlatillo: item["id_platillo"] == null
+                                    ? null
+                                    : _toInt(item["id_platillo"]),
                                 cantidad: 1,
                               );
 
+                              if (res == null || res['success'] != true) {
+                                await _mostrarError(
+                                  res?["message"]?.toString() ??
+                                      res?["error"]?.toString() ??
+                                      "No se pudo aumentar la cantidad",
+                                );
+                                return;
+                              }
+
+                              await _cargarPedido();
                             },
                           ),
 
                           const Spacer(),
 
                           Text(
-                            "\$${(item["precio"] * item["cantidad"]).toStringAsFixed(0)}",
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                            "\$${(_toDouble(item["precio"]) * _toDouble(item["cantidad"])).toStringAsFixed(0)}",
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ],
                       ),
 
-                      /// COMENTARIO
                       Row(
                         children: [
-
                           IconButton(
                             icon: const Icon(Icons.comment),
                             onPressed: () {
-
-                              TextEditingController ctrl =
-                              TextEditingController(text: item["comentario"]);
+                              final TextEditingController ctrl =
+                              TextEditingController(
+                                text: item["comentario"] ?? "",
+                              );
 
                               showDialog(
                                 context: context,
                                 builder: (_) {
-
                                   return AlertDialog(
                                     title: const Text("Comentario"),
-                                    content: TextField(controller: ctrl),
+                                    content: TextField(
+                                      controller: ctrl,
+                                      maxLines: 3,
+                                    ),
                                     actions: [
-
                                       TextButton(
-                                        onPressed: ()=> Navigator.pop(context),
+                                        onPressed: () => Navigator.pop(context),
                                         child: const Text("Cancelar"),
                                       ),
 
                                       ElevatedButton(
                                         onPressed: () async {
-
-                                          setState(() {
-                                            item["comentario"] = ctrl.text;
-                                          });
-
-                                          await _pedidosService.agregarProducto(
+                                          final res = await _pedidosService.agregarProducto(
                                             idPedido: widget.idPedido,
-                                            idProducto: item["id_producto"],
+                                            idDetalle: idDetalle,
+                                            idProducto: item["id_producto"] == null
+                                                ? null
+                                                : _toInt(item["id_producto"]),
+                                            idPlatillo: item["id_platillo"] == null
+                                                ? null
+                                                : _toInt(item["id_platillo"]),
                                             cantidad: 0,
                                             comentario: ctrl.text,
                                           );
 
+                                          if (res == null || res['success'] != true) {
+                                            await _mostrarError(
+                                              res?["message"]?.toString() ??
+                                                  res?["error"]?.toString() ??
+                                                  "No se pudo guardar el comentario",
+                                            );
+                                            return;
+                                          }
+
+                                          if (!mounted) return;
+
                                           Navigator.pop(context);
+                                          await _cargarPedido();
                                         },
                                         child: const Text("Guardar"),
-                                      )
+                                      ),
                                     ],
                                   );
                                 },
@@ -323,7 +377,7 @@ class _PedidoScreenState extends State<PedidoScreen> {
                             },
                           ),
 
-                          if(item["comentario"] != "")
+                          if ((item["comentario"] ?? "").toString().isNotEmpty)
                             Expanded(
                               child: Text(
                                 item["comentario"],
@@ -332,9 +386,9 @@ class _PedidoScreenState extends State<PedidoScreen> {
                                   fontSize: 12,
                                 ),
                               ),
-                            )
+                            ),
                         ],
-                      )
+                      ),
                     ],
                   ),
                 ),
@@ -343,20 +397,29 @@ class _PedidoScreenState extends State<PedidoScreen> {
           ),
         ),
 
-        /// TOTAL
         Container(
           padding: const EdgeInsets.all(12),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text("TOTAL", style: TextStyle(fontSize: 20,fontWeight: FontWeight.bold)),
-              Text("\$${calcularTotal().toStringAsFixed(0)}",
-                  style: const TextStyle(fontSize: 20,fontWeight: FontWeight.bold))
+              const Text(
+                "TOTAL",
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                "\$${calcularTotal().toStringAsFixed(0)}",
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
         ),
 
-        /// BOTON
         Padding(
           padding: const EdgeInsets.all(12),
           child: ElevatedButton(
@@ -366,21 +429,18 @@ class _PedidoScreenState extends State<PedidoScreen> {
             onPressed: confirmarPedido,
             child: const Text("Confirmar pedido"),
           ),
-        )
+        ),
       ],
     );
   }
 
-  /// ============================
-  /// BUILD
-  /// ============================
-
   @override
   Widget build(BuildContext context) {
-
-    if(cargando){
+    if (cargando) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
       );
     }
 
@@ -390,7 +450,6 @@ class _PedidoScreenState extends State<PedidoScreen> {
       ),
       body: Row(
         children: [
-
           Expanded(
             flex: 3,
             child: ProductosGridWidget(
@@ -404,7 +463,7 @@ class _PedidoScreenState extends State<PedidoScreen> {
               color: Colors.grey.shade100,
               child: resumenPedido(),
             ),
-          )
+          ),
         ],
       ),
     );

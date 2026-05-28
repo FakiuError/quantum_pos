@@ -179,12 +179,6 @@ class _VentasScreenState extends State<VentasScreen> {
           Row(
             children: [
               _actionButton(
-                Icons.bakery_dining,
-                'Pan',
-                onTap: _abrirDialogoPan,
-              ),
-              const SizedBox(width: 10),
-              _actionButton(
                 Icons.percent,
                 'Descuento',
                 outlined: true,
@@ -353,121 +347,130 @@ class _VentasScreenState extends State<VentasScreen> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFc0733d),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    onPressed: (total <= 0 || !hayCajaActiva)
-                        ? null
-                        : () async {
-                      final result = await showDialog<Map<String, dynamic>>(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (_) => ConfirmarVentaDialog(
-                          total: total,
-                        ),
-                      );
-
-                      if (result == null) return;
-
-                      final cliente =
-                      Map<String, dynamic>.from(result['cliente']);
-
-                      final String metodoPago =
-                      result['metodo_pago'] as String;
-
-                      final double pagaCon =
-                      (result['paga_con'] ?? total).toDouble();
-
-                      final double cambioCalculado =
-                      metodoPago == 'Efectivo'
-                          ? (pagaCon - total)
-                          : 0;
-
-                      final double totalFinal = total;
-
-                      // 📅 FECHA Y HORA DE LA FACTURA (SE CONGELA AQUÍ)
-                      final DateTime fechaHoraFactura = DateTime.now();
-
-                      final response = await VentasService().registrarVenta(
-                        cliente: cliente,
-                        carrito: carrito,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFc0733d),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: (total <= 0 || !hayCajaActiva)
+                      ? null
+                      : () async {
+                    final result = await showDialog<Map<String, dynamic>>(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (_) => ConfirmarVentaDialog(
                         subtotal: subtotal,
                         descuento: descuento,
-                        total: totalFinal,
-                        metodoPago: metodoPago,
-                        pagaCon: pagaCon,
-                        idCaja: CajaActiva().idCaja!,
-                        idEmpleado: UsuarioActivo().id!,
-                      );
+                        total: total,
+                        items: List<Map<String, dynamic>>.from(carrito),
+                      ),
+                    );
 
-                      if (response == null || response['success'] != true) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                                response?['error'] ??
-                                    '❌ Error al registrar la venta'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                        return;
-                      }
+                    if (result == null) return;
 
-                      // ───── NUMERO DE FACTURA SEGURO ─────
-                      int numeroFactura = 0;
+                    final cliente =
+                    Map<String, dynamic>.from(result['cliente']);
 
-                      if (response['venta'] != null &&
-                          response['venta'] is Map &&
-                          response['venta']['id'] != null) {
-                        numeroFactura = response['venta']['id'];
-                      } else if (response['id_venta'] != null) {
-                        numeroFactura = response['id_venta'];
-                      }
+                    final String metodoPago =
+                    result['metodo_pago'] as String;
 
-                      // 👤 NOMBRE DEL USUARIO QUE ATIENDE
-                      // 👉 Ajusta según cómo manejes usuarios
-                      final String usuarioAtiende =
-                          response['usuario']?['nombre'] ??
-                              'Usuario ${UsuarioActivo().id!}';
+                    final double propina =
+                        double.tryParse(result['propina_valor'].toString()) ?? 0;
 
-                      if (response['caja'] != null) {
-                        CajaActiva().actualizarDesdeBackend(
-                          Map<String, dynamic>.from(response['caja']),
-                        );
-                      }
+                    final double totalFinal =
+                        double.tryParse(result['total_con_propina'].toString()) ?? total;
 
-                      await showDialog(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (_) => DialogoVentaFinal(
-                          numeroFactura: numeroFactura,
-                          cliente:
-                          '${cliente['nombre']} ${cliente['apellido']}',
-                          identificacion:
-                          cliente['identificacion'] ?? 'N/A',
-                          usuario: UsuarioActivo().nombre!,          // 👤 NUEVO
-                          fechaHora: fechaHoraFactura,      // 📅 NUEVO
-                          subtotal: subtotal,
-                          descuento: descuento,
-                          total: totalFinal,
-                          cambio: cambioCalculado,
-                          items:
-                          List<Map<String, dynamic>>.from(carrito),
+                    final double pagaCon =
+                        double.tryParse((result['paga_con'] ?? totalFinal).toString()) ?? totalFinal;
+
+                    final double cambioCalculado =
+                    metodoPago == 'efectivo'
+                        ? (pagaCon - totalFinal)
+                        : 0;
+
+                    // 📅 FECHA Y HORA DE LA FACTURA (SE CONGELA AQUÍ)
+                    final DateTime fechaHoraFactura = DateTime.now();
+
+                    final response = await VentasService().registrarVenta(
+                      cliente: cliente,
+                      carrito: carrito,
+                      subtotal: subtotal,
+                      descuento: descuento,
+                      propina: propina,
+                      total: totalFinal,
+                      metodoPago: metodoPago,
+                      pagaCon: pagaCon,
+                      idCaja: CajaActiva().idCaja!,
+                      idEmpleado: UsuarioActivo().id!,
+                    );
+
+                    if (response == null || response['success'] != true) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                              response?['error'] ??
+                                  '❌ Error al registrar la venta'),
+                          backgroundColor: Colors.red,
                         ),
                       );
+                      return;
+                    }
 
-                      setState(() {
-                        carrito.clear();
-                        descuento = 0;
-                      });
-                    },
-                    child: const Text(
-                      'Cobrar',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
+                    // ───── NUMERO DE FACTURA SEGURO ─────
+                    int numeroFactura = 0;
+
+                    if (response['venta'] != null &&
+                        response['venta'] is Map &&
+                        response['venta']['id'] != null) {
+                      numeroFactura = response['venta']['id'];
+                    } else if (response['id_venta'] != null) {
+                      numeroFactura = response['id_venta'];
+                    }
+
+                    // 👤 NOMBRE DEL USUARIO QUE ATIENDE
+                    // 👉 Ajusta según cómo manejes usuarios
+                    final String usuarioAtiende =
+                        response['usuario']?['nombre'] ??
+                            'Usuario ${UsuarioActivo().id!}';
+
+                    if (response['caja'] != null) {
+                      CajaActiva().actualizarDesdeBackend(
+                        Map<String, dynamic>.from(response['caja']),
+                      );
+                    }
+
+                    await showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (_) => DialogoVentaFinal(
+                        numeroFactura: numeroFactura,
+                        cliente:
+                        '${cliente['nombre']} ${cliente['apellido']}',
+                        identificacion:
+                        cliente['identificacion'] ?? 'N/A',
+                        usuario: UsuarioActivo().nombre!,          // 👤 NUEVO
+                        fechaHora: fechaHoraFactura,      // 📅 NUEVO
+                        subtotal: subtotal,
+                        descuento: descuento,
+                        propina: propina,
+                        total: totalFinal,
+                        cambio: cambioCalculado,
+                        items:
+                        List<Map<String, dynamic>>.from(carrito),
+                      ),
+                    );
+
+                    setState(() {
+                      carrito.clear();
+                      descuento = 0;
+                    });
+                  },
+                  child: const Text(
+                    'Cobrar',
+                    style: TextStyle(fontWeight: FontWeight.bold),
                   ),
+                ),
               ),
             ],
           ),
@@ -892,53 +895,6 @@ class _DialogoPanState extends State<_DialogoPan> {
                 padding: EdgeInsets.symmetric(horizontal: 14),
                 child: VerticalDivider(thickness: 1),
               ),
-
-              /// ───────── TECLADO ─────────
-              Expanded(
-                flex: 2,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    for (var fila in [
-                      ['1', '2', '3'],
-                      ['4', '5', '6'],
-                      ['7', '8', '9'],
-                      ['0', '⌫'],
-                    ])
-                      Row(
-                        children: fila.map((n) {
-                          return Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.all(6),
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                  const Color(0xFFc0733d),
-                                  padding:
-                                  const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                ),
-                                onPressed: n == '⌫'
-                                    ? _borrarNumero
-                                    : () => _agregarNumero(n),
-                                child: Text(
-                                  n,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                  ],
-                ),
-              ),
             ],
           ),
         ),
@@ -948,11 +904,17 @@ class _DialogoPanState extends State<_DialogoPan> {
 }
 
 class ConfirmarVentaDialog extends StatefulWidget {
+  final double subtotal;
+  final double descuento;
   final double total;
+  final List<Map<String, dynamic>> items;
 
   const ConfirmarVentaDialog({
     super.key,
+    required this.subtotal,
+    required this.descuento,
     required this.total,
+    required this.items,
   });
 
   @override
@@ -966,27 +928,38 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
   Map<String, dynamic>? _clienteSeleccionado;
 
   final TextEditingController _buscarClienteCtrl = TextEditingController();
+  final TextEditingController _efectivoCtrl = TextEditingController();
+
+  final TextEditingController _propinaPorcentajeCtrl =
+  TextEditingController(text: '5');
+  final TextEditingController _propinaValorCtrl = TextEditingController();
 
   String metodoPago = 'efectivo';
 
-  final TextEditingController _efectivoCtrl = TextEditingController();
   double pagaCon = 0;
+  double propinaPorcentaje = 5;
+  double propinaValor = 0;
 
   bool cargandoClientes = true;
+  bool _actualizandoPropina = false;
 
   bool get hayCajaActiva => CajaActiva().caja != null;
 
-  double get cambio => pagaCon - widget.total;
+  double get totalConPropina => widget.total + propinaValor;
+
+  double get cambio => pagaCon - totalConPropina;
 
   bool get puedeConfirmar {
     if (!hayCajaActiva) return false;
 
     switch (metodoPago) {
       case 'efectivo':
-        return (pagaCon == 0 || pagaCon >= widget.total);
+        return (pagaCon == 0 || pagaCon >= totalConPropina);
+
       case 'fiado':
         return _clienteSeleccionado != null &&
             _clienteSeleccionado!['id'] != 1;
+
       default:
         return true;
     }
@@ -996,6 +969,18 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
   void initState() {
     super.initState();
     _cargarClientes();
+
+    propinaValor = widget.total * 0.05;
+    _propinaValorCtrl.text = propinaValor.toStringAsFixed(0);
+  }
+
+  @override
+  void dispose() {
+    _buscarClienteCtrl.dispose();
+    _efectivoCtrl.dispose();
+    _propinaPorcentajeCtrl.dispose();
+    _propinaValorCtrl.dispose();
+    super.dispose();
   }
 
   // ───────────── CLIENTES ─────────────
@@ -1004,6 +989,8 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
 
     if (res['success'] == true && res['data'] is List) {
       final list = List<Map<String, dynamic>>.from(res['data']);
+
+      if (!mounted) return;
 
       setState(() {
         _clientes = list;
@@ -1016,14 +1003,16 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
 
   void _filtrarClientes(String v) async {
     final res = await _clientesService.obtenerClientes(buscar: v);
+
     if (res['success'] == true) {
+      if (!mounted) return;
+
       setState(() {
         _clientes = List<Map<String, dynamic>>.from(res['data']);
       });
     }
   }
 
-  // ───────────── TECLADO ─────────────
   void _agregarNumero(String n) {
     setState(() {
       _efectivoCtrl.text += n;
@@ -1036,139 +1025,320 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
       if (_efectivoCtrl.text.isNotEmpty) {
         _efectivoCtrl.text =
             _efectivoCtrl.text.substring(0, _efectivoCtrl.text.length - 1);
+
         pagaCon = double.tryParse(_efectivoCtrl.text) ?? 0;
       }
+    });
+  }
+
+  double _toDouble(dynamic value) {
+    if (value == null) return 0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    return double.tryParse(value.toString()) ?? 0;
+  }
+
+  void _actualizarDesdePorcentaje(String value) {
+    if (_actualizandoPropina) return;
+
+    _actualizandoPropina = true;
+
+    final double porcentaje = double.tryParse(value.replaceAll(',', '.')) ?? 0.0;
+    final double nuevoValor = widget.total * (porcentaje / 100);
+
+    setState(() {
+      propinaPorcentaje = porcentaje;
+      propinaValor = nuevoValor;
+      _propinaValorCtrl.text = nuevoValor.toStringAsFixed(0);
+    });
+
+    _actualizandoPropina = false;
+  }
+
+  void _actualizarDesdeValor(String value) {
+    if (_actualizandoPropina) return;
+
+    _actualizandoPropina = true;
+
+    final double valor = double.tryParse(value.replaceAll(',', '.')) ?? 0.0;
+
+    final double porcentaje =
+    widget.total > 0 ? (valor / widget.total) * 100 : 0.0;
+
+    setState(() {
+      propinaValor = valor;
+      propinaPorcentaje = porcentaje;
+      _propinaPorcentajeCtrl.text = porcentaje.toStringAsFixed(2);
+    });
+
+    _actualizandoPropina = false;
+  }
+
+  void _sinPropina() {
+    setState(() {
+      propinaPorcentaje = 0;
+      propinaValor = 0;
+      _propinaPorcentajeCtrl.text = '0';
+      _propinaValorCtrl.text = '0';
     });
   }
 
   // ───────────── UI ─────────────
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      contentPadding: const EdgeInsets.all(24),
-      content: SizedBox(
-        width: 780,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Confirmar venta',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+    final size = MediaQuery.of(context).size;
 
-            const SizedBox(height: 20),
+    final double dialogMaxWidth =
+    size.width < 1200 ? size.width * 0.94 : 1060;
 
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                /// ───── CLIENTES ─────
-                _buildClientes(),
+    final double dialogMaxHeight = size.height * 0.88;
 
-                const SizedBox(width: 20),
+    final double panelHeight =
+    (dialogMaxHeight - 135).clamp(380.0, 460.0).toDouble();
 
-                /// ───── PAGO ─────
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildMetodosPago(),
-                      const SizedBox(height: 20),
-                      if (metodoPago == 'efectivo')
-                        Row(
-                          children: [
-                            _buildPanelEfectivo(),
-                            const SizedBox(width: 20),
-                            _buildTeclado(),
-                          ],
+    return Dialog(
+      backgroundColor: Colors.white,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 36, vertical: 28),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: dialogMaxWidth,
+          maxHeight: dialogMaxHeight,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(26),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.point_of_sale,
+                    color: Color(0xFFc0733d),
+                    size: 28,
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Confirmar venta',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Cerrar',
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 18),
+
+              SizedBox(
+                height: panelHeight,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: 990,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: 280,
+                          child: _buildClientes(),
                         ),
-                    ],
+
+                        const SizedBox(width: 20),
+
+                        SizedBox(
+                          width: 340,
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: Colors.grey.shade300),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildMetodosPago(),
+
+                                const SizedBox(height: 18),
+
+                                if (metodoPago == 'efectivo')
+                                  _buildPanelEfectivo(),
+
+                                if (metodoPago != 'efectivo')
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(14),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(
+                                        color: Colors.grey.shade300,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          metodoPago == 'bancolombia'
+                                              ? Icons.account_balance
+                                              : metodoPago == 'nequi'
+                                              ? Icons.phone_android
+                                              : metodoPago == 'daviplata'
+                                              ? Icons.account_balance_wallet
+                                              : Icons.schedule,
+                                          color: const Color(0xFFc0733d),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Text(
+                                            metodoPago == 'bancolombia'
+                                                ? 'Pago por Bancolombia'
+                                                : metodoPago == 'nequi'
+                                                ? 'Pago por Nequi'
+                                                : metodoPago == 'daviplata'
+                                                ? 'Pago por Daviplata'
+                                                : 'Venta fiada',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                if (!hayCajaActiva)
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 14),
+                                    child: Text(
+                                      'Debe activar una caja para poder cobrar',
+                                      style: TextStyle(
+                                        color: Colors.orange,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(width: 20),
+
+                        SizedBox(
+                          width: 330,
+                          child: SingleChildScrollView(
+                            child: _buildResumenFactura(),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ],
-            ),
-
-            const SizedBox(height: 20),
-
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                'Total: \$${widget.total.toStringAsFixed(0)}',
-                style:
-                const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-            ),
 
-            if (!hayCajaActiva)
-              const Padding(
-                padding: EdgeInsets.only(top: 12),
-                child: Text(
-                  '⚠ Debe activar una caja para poder cobrar',
-                  style: TextStyle(
-                      color: Colors.orange, fontWeight: FontWeight.bold),
-                ),
+              const SizedBox(height: 18),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.black87,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 14,
+                      ),
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancelar'),
+                  ),
+
+                  const SizedBox(width: 12),
+
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFc0733d),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 28,
+                        vertical: 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onPressed: puedeConfirmar
+                        ? () {
+                      Navigator.pop(context, {
+                        'cliente': _clienteSeleccionado,
+                        'metodo_pago': metodoPago,
+                        'paga_con':
+                        pagaCon > 0 ? pagaCon : totalConPropina,
+                        'propina_porcentaje': propinaPorcentaje,
+                        'propina_valor': propinaValor,
+                        'total_con_propina': totalConPropina,
+                      });
+                    }
+                        : null,
+                    child: const Text(
+                      'Confirmar venta',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-          ],
+            ],
+          ),
         ),
       ),
-      actionsPadding:
-      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      actions: [
-        TextButton(
-          style: TextButton.styleFrom(
-            foregroundColor: Colors.black,
-          ),
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar'),
-        ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFc0733d),
-          ),
-          onPressed: puedeConfirmar
-              ? () {
-            Navigator.pop(context, {
-              'cliente': _clienteSeleccionado,
-              'metodo_pago': metodoPago,
-              'paga_con': pagaCon > 0 ? pagaCon : widget.total,
-            });
-          }
-              : null,
-          child: const Text(
-            'Confirmar venta',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ],
     );
   }
 
   // ───────── CLIENTES ─────────
   Widget _buildClientes() {
-    return SizedBox(
-      width: 300,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Cliente',
-              style: TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 6),
-          TextField(
-            controller: _buscarClienteCtrl,
-            onChanged: _filtrarClientes,
-            decoration: const InputDecoration(
-              hintText: 'Buscar cliente...',
-              prefixIcon: Icon(Icons.search),
-              border: OutlineInputBorder(),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Cliente',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+
+        const SizedBox(height: 8),
+
+        TextField(
+          controller: _buscarClienteCtrl,
+          onChanged: _filtrarClientes,
+          decoration: InputDecoration(
+            hintText: 'Buscar cliente...',
+            prefixIcon: const Icon(Icons.search),
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
-          const SizedBox(height: 10),
-          Container(
-            height: 260,
+        ),
+
+        const SizedBox(height: 12),
+
+        Expanded(
+          child: Container(
             decoration: BoxDecoration(
+              color: Colors.white,
               border: Border.all(color: Colors.grey.shade300),
               borderRadius: BorderRadius.circular(14),
             ),
@@ -1181,11 +1351,20 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
                 final selected = _clienteSeleccionado?['id'] == c['id'];
 
                 return ListTile(
+                  dense: true,
                   selected: selected,
                   selectedTileColor:
                   const Color(0xFFc0733d).withOpacity(0.12),
-                  title: Text(c['nombre'] + " " + c["apellido"]),
-                  subtitle: Text(c['identificacion'] ?? ''),
+                  title: Text(
+                    '${c['nombre']} ${c['apellido']}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    c['identificacion'] ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   onTap: () {
                     setState(() {
                       _clienteSeleccionado = c;
@@ -1195,25 +1374,40 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
               },
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   // ───────── MÉTODOS ─────────
   Widget _buildMetodosPago() {
-    return GridView.count(
-      crossAxisCount: 5,
-      shrinkWrap: true,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      physics: const NeverScrollableScrollPhysics(),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _metodoPagoCard('efectivo', 'Efectivo', Icons.payments),
-        _metodoPagoCard('bancolombia', 'Bancolombia', Icons.account_balance,),
-        _metodoPagoCard('nequi', 'Nequi', Icons.phone_android),
-        _metodoPagoCard('daviplata', 'Daviplata', Icons.account_balance_wallet),
-        _metodoPagoCard('fiado', 'Fiado', Icons.schedule),
+        const Text(
+          'Método de pago',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            _metodoPagoCard('efectivo', 'Efectivo', Icons.payments),
+            _metodoPagoCard('bancolombia', 'Bancolombia', Icons.account_balance),
+            _metodoPagoCard('nequi', 'Nequi', Icons.phone_android),
+            _metodoPagoCard(
+              'daviplata',
+              'Daviplata',
+              Icons.account_balance_wallet,
+            ),
+            _metodoPagoCard('fiado', 'Fiado', Icons.schedule),
+          ],
+        ),
       ],
     );
   }
@@ -1221,30 +1415,60 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
   Widget _metodoPagoCard(String value, String label, IconData icon) {
     final selected = metodoPago == value;
 
-    return InkWell(
-      onTap: () => setState(() => metodoPago = value),
-      child: Container(
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFFc0733d) : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color:
-            selected ? const Color(0xFFc0733d) : Colors.grey.shade300,
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: selected ? Colors.white : Colors.black),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: selected ? Colors.white : Colors.black,
-                fontWeight: FontWeight.w600,
-              ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () {
+          setState(() {
+            metodoPago = value;
+          });
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          width: 100,
+          height: 76,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFFc0733d) : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected ? const Color(0xFFc0733d) : Colors.grey.shade300,
             ),
-          ],
+            boxShadow: selected
+                ? [
+              BoxShadow(
+                color: const Color(0xFFc0733d).withOpacity(0.22),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ]
+                : [],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 22,
+                color: selected ? Colors.white : Colors.black87,
+              ),
+
+              const SizedBox(height: 6),
+
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: selected ? Colors.white : Colors.black87,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11.5,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1252,20 +1476,38 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
 
   // ───────── EFECTIVO ─────────
   Widget _buildPanelEfectivo() {
-    return SizedBox(
-      width: 240,
+    final bool digitoValor = _efectivoCtrl.text.trim().isNotEmpty;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Paga con'),
-          const SizedBox(height: 6),
+          const Text(
+            'Paga con',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+
+          const SizedBox(height: 8),
+
           TextField(
             controller: _efectivoCtrl,
             keyboardType: TextInputType.number,
             autofocus: true,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               prefixText: '\$ ',
-              border: OutlineInputBorder(),
+              isDense: true,
+              filled: true,
+              fillColor: Colors.grey.shade50,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             onChanged: (value) {
               setState(() {
@@ -1273,56 +1515,202 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
               });
             },
           ),
+
           const SizedBox(height: 10),
-          Text(
-            cambio >= 0
-                ? 'Cambio: \$${cambio.toStringAsFixed(0)}'
-                : 'Faltan: \$${cambio.abs().toStringAsFixed(0)}',
+
+          if (!digitoValor)
+            Text(
+              'Total a pagar: \$${totalConPropina.toStringAsFixed(0)}',
+              style: const TextStyle(
+                color: Color(0xFFc0733d),
+                fontWeight: FontWeight.bold,
+              ),
+            )
+          else
+            Text(
+              cambio >= 0
+                  ? 'Cambio: \$${cambio.toStringAsFixed(0)}'
+                  : 'Faltan: \$${cambio.abs().toStringAsFixed(0)}',
+              style: TextStyle(
+                color: cambio >= 0 ? Colors.green : Colors.red,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ───────── RESUMEN FACTURA ─────────
+  Widget _buildResumenFactura() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Resumen a facturar',
             style: TextStyle(
-              color: cambio >= 0 ? Colors.green : Colors.red,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
+          ),
+
+          const SizedBox(height: 12),
+
+          Container(
+            constraints: const BoxConstraints(maxHeight: 180),
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: widget.items.length,
+              separatorBuilder: (_, __) => Divider(
+                height: 12,
+                color: Colors.grey.shade300,
+              ),
+              itemBuilder: (_, i) {
+                final item = widget.items[i];
+
+                final nombre = item['nombre']?.toString() ?? '';
+                final cantidad = _toDouble(item['cantidad']);
+                final precio = _toDouble(item['precio']);
+                final totalItem = cantidad * precio;
+
+                return Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '$nombre x ${cantidad.toStringAsFixed(cantidad % 1 == 0 ? 0 : 2)}',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ),
+                    Text(
+                      '\$${totalItem.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+
+          const Divider(height: 24),
+
+          _rowResumen('Subtotal', widget.subtotal),
+
+          if (widget.descuento > 0)
+            _rowResumen('Descuento', -widget.descuento),
+
+          const SizedBox(height: 12),
+
+          const Text(
+            'Propina',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+
+          const SizedBox(height: 8),
+
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _propinaPorcentajeCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: '%',
+                    suffixText: '%',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  onChanged: _actualizarDesdePorcentaje,
+                ),
+              ),
+
+              const SizedBox(width: 10),
+
+              Expanded(
+                child: TextField(
+                  controller: _propinaValorCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Valor',
+                    prefixText: '\$ ',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  onChanged: _actualizarDesdeValor,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _sinPropina,
+              icon: const Icon(Icons.money_off),
+              label: const Text('Sin propina'),
+            ),
+          ),
+
+          const Divider(height: 24),
+
+          _rowResumen('Propina', propinaValor),
+
+          const SizedBox(height: 6),
+
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Total a pagar',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 17,
+                  ),
+                ),
+              ),
+              Text(
+                '\$${totalConPropina.toStringAsFixed(0)}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                  color: Color(0xFFc0733d),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  // ───────── TECLADO ─────────
-  Widget _buildTeclado() {
-    return SizedBox(
-      width: 200,
-      child: Column(
+  Widget _rowResumen(String label, double value) {
+    final negativo = value < 0;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
         children: [
-          for (var fila in [
-            ['1', '2', '3'],
-            ['4', '5', '6'],
-            ['7', '8', '9'],
-            ['0', '⌫']
-          ])
-            Row(
-              children: fila.map((n) {
-                return Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(6),
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFc0733d),
-                        padding:
-                        const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      onPressed:
-                      n == '⌫' ? _borrarNumero : () => _agregarNumero(n),
-                      child: Text(
-                        n,
-                        style: const TextStyle(
-                            fontSize: 18, color: Colors.white),
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
+          Expanded(
+            child: Text(label),
+          ),
+          Text(
+            '${negativo ? '-' : ''}\$${value.abs().toStringAsFixed(0)}',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: negativo ? Colors.red : Colors.black,
             ),
+          ),
         ],
       ),
     );
@@ -1336,6 +1724,7 @@ class DialogoVentaFinal extends StatefulWidget {
 
   final double subtotal;
   final double descuento;
+  final double propina;
   final double total;
   final double cambio;
 
@@ -1350,6 +1739,7 @@ class DialogoVentaFinal extends StatefulWidget {
     required this.identificacion,
     required this.subtotal,
     required this.descuento,
+    required this.propina,
     required this.total,
     required this.cambio,
     required this.items,
@@ -1491,6 +1881,7 @@ class _DialogoVentaFinalState extends State<DialogoVentaFinal> {
                             fechaHora: DateTime.now(),             // ← NUEVO
                             subtotal: widget.subtotal,
                             descuento: widget.descuento,
+                            propina: widget.propina,
                             total: widget.total,
                             cambio: widget.cambio,
                             items: widget.items,
