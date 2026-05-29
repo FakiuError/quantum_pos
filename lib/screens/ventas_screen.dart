@@ -129,7 +129,7 @@ class _VentasScreenState extends State<VentasScreen> {
     required double valorTotal,
     required Map<String, dynamic> producto,
   }) {
-    final precioUnitario = producto['precio'];
+    final precioUnitario = double.tryParse(producto['precio'].toString()) ?? 0;
     final totalReal = precioUnitario * cantidad;
     final descuentoGenerado = totalReal - valorTotal;
 
@@ -179,6 +179,13 @@ class _VentasScreenState extends State<VentasScreen> {
           Row(
             children: [
               _actionButton(
+                Icons.bakery_dining,
+                'Pan',
+                outlined: false,
+                onTap: _abrirDialogoPan,
+              ),
+              const SizedBox(width: 10),
+              _actionButton(
                 Icons.percent,
                 'Descuento',
                 outlined: true,
@@ -186,6 +193,7 @@ class _VentasScreenState extends State<VentasScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 20),
           const SizedBox(height: 20),
           const Text(
             'Resumen de venta',
@@ -795,13 +803,19 @@ class _DialogoPanState extends State<_DialogoPan> {
 
                     TextField(
                       controller: _valorCtrl,
-                      readOnly: true,
                       textAlign: TextAlign.center,
+                      keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
                         labelText: 'Valor a gastar',
                         prefixText: '\$ ',
                         border: OutlineInputBorder(),
                       ),
+                      onChanged: (value) {
+                        setState(() {
+                          valor = double.tryParse(value.replaceAll(',', '.')) ?? 0;
+                          _recalcularCantidad();
+                        });
+                      },
                     ),
 
                     const SizedBox(height: 20),
@@ -931,13 +945,13 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
   final TextEditingController _efectivoCtrl = TextEditingController();
 
   final TextEditingController _propinaPorcentajeCtrl =
-  TextEditingController(text: '5');
+  TextEditingController(text: '0');
   final TextEditingController _propinaValorCtrl = TextEditingController();
 
   String metodoPago = 'efectivo';
 
   double pagaCon = 0;
-  double propinaPorcentaje = 5;
+  double propinaPorcentaje = 0;
   double propinaValor = 0;
 
   bool cargandoClientes = true;
@@ -969,9 +983,6 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
   void initState() {
     super.initState();
     _cargarClientes();
-
-    propinaValor = widget.total * 0.05;
-    _propinaValorCtrl.text = propinaValor.toStringAsFixed(0);
   }
 
   @override

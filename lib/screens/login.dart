@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:panaderia_nicol_pos/Services/Login_service.dart';
-import 'package:panaderia_nicol_pos/screens/mesas_screen.dart';
 import 'package:panaderia_nicol_pos/widgets/custom_window_bar.dart';
 
 import 'layout/main_layout.dart';
