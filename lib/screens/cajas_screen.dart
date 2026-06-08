@@ -4,7 +4,8 @@ import 'package:panaderia_nicol_pos/screens/dialog/crear_caja_dialog.dart';
 import 'package:panaderia_nicol_pos/screens/core/caja_activa.dart';
 import 'package:panaderia_nicol_pos/screens/dialog/nuevo_gasto_dialog.dart';
 import 'package:panaderia_nicol_pos/screens/core/usuario_activo.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:panaderia_nicol_pos/Services/reporte_caja_pdf_service.dart';
 
 class CajasScreen extends StatefulWidget {
   const CajasScreen({Key? key}) : super(key: key);
@@ -493,31 +494,76 @@ class _CajasScreenState extends State<CajasScreen> {
                   return;
                 }
 
-                final res = await CajasService().cerrarCaja(
-                  idCaja: CajaActiva().idCaja!,
-                  idEmpleado: UsuarioActivo().id!,
+                var dialogoCargandoAbierto = true;
+
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (_) => const Center(child: CircularProgressIndicator()),
                 );
 
-                if (res['success'] == true) {
+                try {
+                  final res = await CajasService().cerrarCaja(
+                    idCaja: CajaActiva().idCaja!,
+                    idEmpleado: UsuarioActivo().id!,
+                  );
 
-                  // 1️⃣ ABRIR PDF
-                  final url = Uri.parse(res['pdf']);
-                  if (await canLaunchUrl(url)) {
-                    await launchUrl(url, mode: LaunchMode.externalApplication);
+                  if (!mounted) return;
+                  if (dialogoCargandoAbierto) {
+                    Navigator.pop(context);
+                    dialogoCargandoAbierto = false;
                   }
 
-                  // 2️⃣ LIMPIAR CAJA ACTIVA
-                  CajaActiva().limpiar();
+                  if (res['success'] == true) {
+                    final reporte = res['reporte'] is Map
+                        ? Map<String, dynamic>.from(res['reporte'])
+                        : <String, dynamic>{};
 
-                  // 3️⃣ RECARGAR CAJAS ABIERTAS
-                  await _cargarCajas();
+                    String? rutaReporte;
 
-                  // 4️⃣ ACTUALIZAR UI
-                  setState(() {});
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(res['error'] ?? 'Error al cerrar caja')),
-                  );
+                    try {
+                      rutaReporte = await ReporteCajaPdfService()
+                          .generarReporteCajaDiario(reporte);
+                      await OpenFilex.open(rutaReporte);
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Caja cerrada, pero no se pudo crear el PDF local: $e',
+                          ),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                    }
+
+                    CajaActiva().limpiar();
+                    await _cargarCajas();
+
+                    if (!mounted) return;
+                    setState(() {});
+
+                    if (rutaReporte != null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Reporte guardado en: $rutaReporte'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(res['error'] ?? 'Error al cerrar caja')),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    if (dialogoCargandoAbierto) {
+                      Navigator.pop(context);
+                    }
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error al cerrar caja: $e')),
+                    );
+                  }
                 }
               },
             ),
