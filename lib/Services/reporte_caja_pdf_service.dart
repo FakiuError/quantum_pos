@@ -183,7 +183,7 @@ class _ReporteCajaPdfBuilder {
           pw.SizedBox(height: 16),
           _seccionTitulo('Balance de inventario del turno'),
           _nota(
-            'Stock inicial estimado = stock final actual + vendido + bajas - entradas. Para tener inventario físico exacto, a futuro conviene crear un conteo diario de apertura y cierre.',
+            'Stock inicial = inventario guardado al abrir la caja. Stock esperado = inicial + entradas - vendido - bajas. Diferencia = stock final del sistema - stock esperado.',
           ),
           _tablaInventario(inventario),
         ],
@@ -660,28 +660,30 @@ class _ReporteCajaPdfBuilder {
     }
 
     final data = <List<String>>[
-      ['Código', 'Producto', 'Stock inicial estimado', 'Entradas', 'Vendido', 'Bajas', 'Stock final', 'Mov. neto'],
+      ['Código', 'Producto', 'Stock inicial', 'Entradas', 'Vendido', 'Bajas', 'Stock esperado', 'Stock final', 'Dif.'],
       ...rows.map((r) => [
             _texto(r['codigo']),
-            _recortar(_texto(r['nombre']), 30),
+            _recortar(_texto(r['nombre']), 28),
             _cantidad(r['stock_inicial_estimado']),
             _cantidad(r['entradas']),
             _cantidad(r['vendido']),
             _cantidad(r['bajas']),
+            _cantidad(r['stock_final_esperado'] ?? r['stock_final']),
             _cantidad(r['stock_final']),
-            _cantidad(r['movimiento_neto']),
+            _cantidad(r['diferencia_inventario'] ?? 0),
           ]),
     ];
 
-    return _tabla(data, fontSize: 6.7, columnWidths: {
-      0: const pw.FlexColumnWidth(0.75),
-      1: const pw.FlexColumnWidth(2.1),
-      2: const pw.FlexColumnWidth(1.0),
-      3: const pw.FlexColumnWidth(0.75),
-      4: const pw.FlexColumnWidth(0.75),
-      5: const pw.FlexColumnWidth(0.7),
-      6: const pw.FlexColumnWidth(0.8),
-      7: const pw.FlexColumnWidth(0.8),
+    return _tabla(data, fontSize: 6.2, columnWidths: {
+      0: const pw.FlexColumnWidth(0.72),
+      1: const pw.FlexColumnWidth(1.85),
+      2: const pw.FlexColumnWidth(0.86),
+      3: const pw.FlexColumnWidth(0.68),
+      4: const pw.FlexColumnWidth(0.68),
+      5: const pw.FlexColumnWidth(0.62),
+      6: const pw.FlexColumnWidth(0.86),
+      7: const pw.FlexColumnWidth(0.78),
+      8: const pw.FlexColumnWidth(0.58),
     });
   }
 
