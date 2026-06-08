@@ -803,19 +803,13 @@ class _DialogoPanState extends State<_DialogoPan> {
 
                     TextField(
                       controller: _valorCtrl,
+                      readOnly: true,
                       textAlign: TextAlign.center,
-                      keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
                         labelText: 'Valor a gastar',
                         prefixText: '\$ ',
                         border: OutlineInputBorder(),
                       ),
-                      onChanged: (value) {
-                        setState(() {
-                          valor = double.tryParse(value.replaceAll(',', '.')) ?? 0;
-                          _recalcularCantidad();
-                        });
-                      },
                     ),
 
                     const SizedBox(height: 20),
@@ -908,6 +902,53 @@ class _DialogoPanState extends State<_DialogoPan> {
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 14),
                 child: VerticalDivider(thickness: 1),
+              ),
+
+              /// ───────── TECLADO ─────────
+              Expanded(
+                flex: 2,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    for (var fila in [
+                      ['1', '2', '3'],
+                      ['4', '5', '6'],
+                      ['7', '8', '9'],
+                      ['0', '⌫'],
+                    ])
+                      Row(
+                        children: fila.map((n) {
+                          return Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.all(6),
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor:
+                                  const Color(0xFFc0733d),
+                                  padding:
+                                  const EdgeInsets.symmetric(vertical: 16),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                onPressed: n == '⌫'
+                                    ? _borrarNumero
+                                    : () => _agregarNumero(n),
+                                child: Text(
+                                  n,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                  ],
+                ),
               ),
             ],
           ),

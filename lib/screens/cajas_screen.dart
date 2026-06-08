@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:panaderia_nicol_pos/Services/cajas_service.dart';
 import 'package:panaderia_nicol_pos/screens/dialog/crear_caja_dialog.dart';
@@ -20,6 +21,7 @@ class _CajasScreenState extends State<CajasScreen> {
 
   bool _loading = true;
   bool _menuFlotanteAbierto = false;
+  bool _cerrandoCaja = false;
 
   List<Map<String, dynamic>> _cajasAbiertas = [];
   Map<String, dynamic>? _cajaSeleccionada;
@@ -81,6 +83,308 @@ class _CajasScreenState extends State<CajasScreen> {
 
       _cargarCajas();
     }
+  }
+
+  Future<bool> _confirmarCerrarCaja() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        titlePadding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
+        contentPadding: const EdgeInsets.fromLTRB(24, 14, 24, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFc0733d).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.price_check_rounded,
+                color: Color(0xFFc0733d),
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Cerrar caja',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          '¿Deseas cerrar esta caja?\n\n'
+          'Se cerrará la caja activa y se generará el reporte diario en el equipo local.',
+          style: TextStyle(height: 1.35),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('No, cancelar'),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFc0733d),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.check_rounded, size: 18),
+            label: const Text('Sí, cerrar'),
+          ),
+        ],
+      ),
+    );
+
+    return ok == true;
+  }
+
+  Future<void> _cerrarCajaConReporte() async {
+    if (_cerrandoCaja) return;
+
+    if (!CajaActiva().tieneCajaActiva) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Debes activar una caja antes de cerrarla'),
+        ),
+      );
+      return;
+    }
+
+    final confirmado = await _confirmarCerrarCaja();
+    if (!confirmado) return;
+
+    if (!mounted) return;
+
+    setState(() => _cerrandoCaja = true);
+
+    final cerrarNotificacion = _mostrarNotificacionReporteCaja(
+      mensaje: 'Generando reporte de caja',
+      cargando: true,
+    );
+
+    try {
+      final res = await CajasService().cerrarCaja(
+        idCaja: CajaActiva().idCaja!,
+        idEmpleado: UsuarioActivo().id!,
+      );
+
+      if (!mounted) {
+        cerrarNotificacion();
+        return;
+      }
+
+      if (res['success'] == true) {
+        final reporte = res['reporte'] is Map
+            ? Map<String, dynamic>.from(res['reporte'])
+            : <String, dynamic>{};
+
+        CajaActiva().limpiar();
+        await _cargarCajas();
+
+        if (!mounted) {
+          cerrarNotificacion();
+          return;
+        }
+        setState(() => _cerrandoCaja = false);
+
+        unawaited(
+          _generarReporteCajaEnSegundoPlano(
+            reporte: reporte,
+            cerrarNotificacion: cerrarNotificacion,
+          ),
+        );
+      } else {
+        cerrarNotificacion();
+        if (!mounted) return;
+        setState(() => _cerrandoCaja = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(res['error'] ?? 'Error al cerrar caja')),
+        );
+      }
+    } catch (e) {
+      cerrarNotificacion();
+      if (!mounted) return;
+      setState(() => _cerrandoCaja = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al cerrar caja: $e')),
+      );
+    }
+  }
+
+  Future<void> _generarReporteCajaEnSegundoPlano({
+    required Map<String, dynamic> reporte,
+    required VoidCallback cerrarNotificacion,
+  }) async {
+    try {
+      final rutaReporte = await ReporteCajaPdfService()
+          .generarReporteCajaDiario(reporte);
+
+      cerrarNotificacion();
+
+      if (!mounted) return;
+
+      _mostrarNotificacionReporteCaja(
+        mensaje: 'Reporte de caja generado correctamente',
+        icono: Icons.check_circle_rounded,
+        color: const Color(0xFF2E7D32),
+        duracion: const Duration(seconds: 4),
+      );
+
+      await OpenFilex.open(rutaReporte);
+    } catch (e) {
+      cerrarNotificacion();
+
+      if (!mounted) return;
+
+      _mostrarNotificacionReporteCaja(
+        mensaje: 'Caja cerrada, pero no se pudo crear el PDF local',
+        icono: Icons.warning_amber_rounded,
+        color: Colors.orange.shade800,
+        duracion: const Duration(seconds: 6),
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Caja cerrada, pero no se pudo crear el PDF local: $e'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+  }
+
+  VoidCallback _mostrarNotificacionReporteCaja({
+    required String mensaje,
+    bool cargando = false,
+    IconData? icono,
+    Color color = const Color(0xFF7A4423),
+    Duration? duracion,
+  }) {
+    final overlay = Overlay.of(context);
+    late OverlayEntry entry;
+    var removida = false;
+
+    void cerrar() {
+      if (removida) return;
+      removida = true;
+      entry.remove();
+    }
+
+    entry = OverlayEntry(
+      builder: (_) => Positioned(
+        right: 24,
+        bottom: 24,
+        child: TweenAnimationBuilder<double>(
+          duration: const Duration(milliseconds: 260),
+          tween: Tween(begin: 18, end: 0),
+          curve: Curves.easeOutCubic,
+          builder: (context, value, child) => Transform.translate(
+            offset: Offset(value, 0),
+            child: Opacity(
+              opacity: ((18 - value) / 18).clamp(0.0, 1.0),
+              child: child,
+            ),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 310, maxWidth: 390),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: color.withOpacity(0.16)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.16),
+                    blurRadius: 24,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.10),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Center(
+                      child: cargando
+                          ? SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.6,
+                                color: color,
+                              ),
+                            )
+                          : Icon(icono ?? Icons.info_rounded, color: color),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          mensaje,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13.5,
+                          ),
+                        ),
+                        if (cargando) ...[
+                          const SizedBox(height: 3),
+                          const Text(
+                            'Puedes seguir usando el sistema mientras se crea el PDF.',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: Colors.black54,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (!cargando) ...[
+                    const SizedBox(width: 8),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: cerrar,
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(Icons.close_rounded, size: 18),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(entry);
+
+    if (duracion != null) {
+      Future.delayed(duracion, cerrar);
+    }
+
+    return cerrar;
   }
 
   Future<void> _abrirVentasCajaActual() async {
@@ -482,90 +786,18 @@ class _CajasScreenState extends State<CajasScreen> {
                 padding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
-              icon: const Icon(Icons.price_check),
-              label: const Text('Cerrar Caja'),
-              onPressed: () async {
-                if (!CajaActiva().tieneCajaActiva) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('⚠️ Debes activar una caja antes de cerrarla'),
-                    ),
-                  );
-                  return;
-                }
-
-                var dialogoCargandoAbierto = true;
-
-                showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (_) => const Center(child: CircularProgressIndicator()),
-                );
-
-                try {
-                  final res = await CajasService().cerrarCaja(
-                    idCaja: CajaActiva().idCaja!,
-                    idEmpleado: UsuarioActivo().id!,
-                  );
-
-                  if (!mounted) return;
-                  if (dialogoCargandoAbierto) {
-                    Navigator.pop(context);
-                    dialogoCargandoAbierto = false;
-                  }
-
-                  if (res['success'] == true) {
-                    final reporte = res['reporte'] is Map
-                        ? Map<String, dynamic>.from(res['reporte'])
-                        : <String, dynamic>{};
-
-                    String? rutaReporte;
-
-                    try {
-                      rutaReporte = await ReporteCajaPdfService()
-                          .generarReporteCajaDiario(reporte);
-                      await OpenFilex.open(rutaReporte);
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Caja cerrada, pero no se pudo crear el PDF local: $e',
-                          ),
-                          backgroundColor: Colors.orange,
-                        ),
-                      );
-                    }
-
-                    CajaActiva().limpiar();
-                    await _cargarCajas();
-
-                    if (!mounted) return;
-                    setState(() {});
-
-                    if (rutaReporte != null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Reporte guardado en: $rutaReporte'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    }
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(res['error'] ?? 'Error al cerrar caja')),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    if (dialogoCargandoAbierto) {
-                      Navigator.pop(context);
-                    }
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error al cerrar caja: $e')),
-                    );
-                  }
-                }
-              },
+              icon: _cerrandoCaja
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.price_check),
+              label: Text(_cerrandoCaja ? 'Cerrando...' : 'Cerrar Caja'),
+              onPressed: _cerrandoCaja ? null : _cerrarCajaConReporte,
             ),
 
             const SizedBox(width: 15), // 👈 espacio entre botones
