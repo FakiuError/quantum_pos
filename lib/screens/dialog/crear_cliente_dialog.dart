@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:panaderia_nicol_pos/Services/clientes_service.dart';
+import 'package:panaderia_nicol_pos/utils/currency_utils.dart';
 
 class CrearClienteDialog extends StatefulWidget {
   final Map<String, dynamic>? cliente; //
@@ -33,7 +34,7 @@ class _CrearClienteDialogState extends State<CrearClienteDialog> {
       _identificacionCtrl.text = widget.cliente!['identificacion'] ?? '';
       _telefonoCtrl.text = widget.cliente!['telefono'] ?? '';
       _correoCtrl.text = widget.cliente!['correo'] ?? '';
-      _deudaCtrl.text = widget.cliente!['deuda']?.toString() ?? '';
+      _deudaCtrl.text = CurrencyUtils.formatControllerValue(widget.cliente!['deuda'] ?? 0);
     }
   }
 
@@ -55,7 +56,7 @@ class _CrearClienteDialogState extends State<CrearClienteDialog> {
       identificacion: _identificacionCtrl.text.trim(),
       telefono: _telefonoCtrl.text.trim(),
       correo: _correoCtrl.text.trim(),
-      deuda: double.tryParse(_deudaCtrl.text.trim()) ?? 0.0,
+      deuda: CurrencyUtils.parse(_deudaCtrl.text),
     )
         : await _service.crearCliente(
       nombre: _nombreCtrl.text.trim(),
@@ -63,7 +64,7 @@ class _CrearClienteDialogState extends State<CrearClienteDialog> {
       identificacion: _identificacionCtrl.text.trim(),
       telefono: _telefonoCtrl.text.trim(),
       correo: _correoCtrl.text.trim(),
-      deuda: double.tryParse(_deudaCtrl.text.trim()) ?? 0.0,
+      deuda: CurrencyUtils.parse(_deudaCtrl.text),
     );
 
     setState(() => _guardando = false);
@@ -113,6 +114,7 @@ class _CrearClienteDialogState extends State<CrearClienteDialog> {
               _deudaCtrl,
               'Deuda',
               keyboard: TextInputType.number,
+              money: true,
             ),
           ],
         ),
@@ -145,15 +147,19 @@ class _CrearClienteDialogState extends State<CrearClienteDialog> {
       TextEditingController c,
       String label, {
         TextInputType keyboard = TextInputType.text,
+        bool money = false,
       }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
         controller: c,
-        keyboardType: keyboard,
+        keyboardType: money ? TextInputType.number : keyboard,
+        inputFormatters:
+            money ? const [ColombianCurrencyInputFormatter()] : null,
         style: const TextStyle(color: Colors.black),
         decoration: InputDecoration(
           labelText: label,
+          hintText: money ? '\$ 0' : null,
           labelStyle: const TextStyle(color: Colors.black),
           floatingLabelStyle: const TextStyle(color: Colors.black),
           enabledBorder: const UnderlineInputBorder(

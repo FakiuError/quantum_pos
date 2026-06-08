@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+import 'package:panaderia_nicol_pos/utils/currency_utils.dart';
 
 class EscPosService {
   static const _channel = MethodChannel('escpos_usb');
@@ -102,8 +103,8 @@ class EscPosService {
     // ───────── ITEMS ─────────
     for (final p in items) {
       final nombre = (p['nombre'] ?? '').toString();
-      final cantidad = p['cantidad'];
-      final precio = p['precio'];
+      final cantidad = CurrencyUtils.parse(p['cantidad']);
+      final precio = CurrencyUtils.parse(p['precio']);
       final totalItem = precio * cantidad;
 
       final lineasNombre = _splitText(nombre, 20);
@@ -112,8 +113,8 @@ class EscPosService {
       bytes.addAll(gen.row([
         PosColumn(text: lineasNombre[0], width: 5),
         PosColumn(text: cantidad.toString(), width: 2, styles: const PosStyles(align: PosAlign.center)),
-        PosColumn(text: '\$${precio.toStringAsFixed(0)}', width: 2, styles: const PosStyles(align: PosAlign.right)),
-        PosColumn(text: '\$${totalItem.toStringAsFixed(0)}', width: 3, styles: const PosStyles(align: PosAlign.right)),
+        PosColumn(text: CurrencyUtils.formatCop(precio), width: 2, styles: const PosStyles(align: PosAlign.right)),
+        PosColumn(text: CurrencyUtils.formatCop(totalItem), width: 3, styles: const PosStyles(align: PosAlign.right)),
       ]));
 
       // Líneas adicionales del nombre
@@ -130,25 +131,25 @@ class EscPosService {
     bytes.addAll(gen.hr());
 
     // ───────── TOTALES ─────────
-    bytes.addAll(gen.text('Subtotal: \$${subtotal.toStringAsFixed(0)}'));
+    bytes.addAll(gen.text('Subtotal: ${CurrencyUtils.formatCop(subtotal)}'));
 
     if (descuento > 0) {
-      bytes.addAll(gen.text('Descuento: -\$${descuento.toStringAsFixed(0)}'));
+      bytes.addAll(gen.text('Descuento: -${CurrencyUtils.formatCop(descuento)}'));
     }
 
     if (propina > 0) {
-      bytes.addAll(gen.text('Propina: \$${propina.toStringAsFixed(0)}'));
+      bytes.addAll(gen.text('Propina: ${CurrencyUtils.formatCop(propina)}'));
     }
 
     bytes.addAll(gen.text(
-      'TOTAL: \$${total.toStringAsFixed(0)}',
+      'TOTAL: ${CurrencyUtils.formatCop(total)}',
       styles: const PosStyles(bold: true, height: PosTextSize.size2),
     ));
 
     // 🔄 CAMBIO (AQUÍ ESTÁ LA CORRECCIÓN)
     if (cambio > 0) {
       bytes.addAll(gen.text(
-        'Cambio: \$${cambio.toStringAsFixed(0)}',
+        'Cambio: ${CurrencyUtils.formatCop(cambio)}',
         styles: const PosStyles(bold: true),
       ));
     }

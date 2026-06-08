@@ -8,6 +8,7 @@ import 'package:panaderia_nicol_pos/screens/core/caja_activa.dart';
 import 'package:panaderia_nicol_pos/screens/core/esc_pos_service.dart';
 import 'package:panaderia_nicol_pos/screens/core/usuario_activo.dart';
 import 'package:panaderia_nicol_pos/widgets/productos_grid_widget.dart';
+import 'package:panaderia_nicol_pos/utils/currency_utils.dart';
 
 class VentasScreen extends StatefulWidget {
   final int idUsuario;
@@ -93,7 +94,7 @@ class _VentasScreenState extends State<VentasScreen> {
     final i = carrito.indexWhere((e) => e['id'] == p['id']);
 
     // 🔥 CONVERSIÓN SEGURA
-    final precio = double.tryParse(p['precio'].toString()) ?? 0;
+    final precio = CurrencyUtils.parse(p['precio']);
 
     setState(() {
       if (i == -1) {
@@ -129,7 +130,7 @@ class _VentasScreenState extends State<VentasScreen> {
     required double valorTotal,
     required Map<String, dynamic> producto,
   }) {
-    final precioUnitario = double.tryParse(producto['precio'].toString()) ?? 0;
+    final precioUnitario = CurrencyUtils.parse(producto['precio']);
     final totalReal = precioUnitario * cantidad;
     final descuentoGenerado = totalReal - valorTotal;
 
@@ -281,7 +282,7 @@ class _VentasScreenState extends State<VentasScreen> {
 
                       /// PRECIO
                       Text(
-                        '\$${(p['precio'] * p['cantidad']).toStringAsFixed(0)}',
+                        CurrencyUtils.formatCop(p['precio'] * p['cantidad']),
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
 
@@ -383,14 +384,14 @@ class _VentasScreenState extends State<VentasScreen> {
                     final String metodoPago =
                     result['metodo_pago'] as String;
 
-                    final double propina =
-                        double.tryParse(result['propina_valor'].toString()) ?? 0;
+                    final double propina = CurrencyUtils.parse(result['propina_valor']);
 
-                    final double totalFinal =
-                        double.tryParse(result['total_con_propina'].toString()) ?? total;
+                    final double totalFinal = CurrencyUtils.parse(result['total_con_propina']) > 0
+                        ? CurrencyUtils.parse(result['total_con_propina'])
+                        : total;
 
                     final double pagaCon =
-                        double.tryParse((result['paga_con'] ?? totalFinal).toString()) ?? totalFinal;
+                        CurrencyUtils.parse(result['paga_con'] ?? totalFinal);
 
                     final double cambioCalculado =
                     metodoPago == 'efectivo'
@@ -519,7 +520,7 @@ class _VentasScreenState extends State<VentasScreen> {
         Text(t,
             style:
             TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.w400)),
-        Text('\$${v.toStringAsFixed(0)}',
+        Text(CurrencyUtils.formatCop(v),
             style:
             TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.w400)),
       ],
@@ -679,7 +680,8 @@ class _VentasScreenState extends State<VentasScreen> {
         content: TextField(
           controller: c,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(prefixText: '\$ '),
+          inputFormatters: const [ColombianCurrencyInputFormatter()],
+          decoration: const InputDecoration(hintText: '\$ 0'),
         ),
         actions: [
           TextButton(
@@ -687,9 +689,10 @@ class _VentasScreenState extends State<VentasScreen> {
               child: const Text('Cancelar')),
           ElevatedButton(
             onPressed: () {
-              final valor = double.tryParse(c.text) ?? subtotal;
+              final valor = CurrencyUtils.parse(c.text);
+              final valorAplicado = valor <= 0 ? subtotal : valor;
               setState(() {
-                descuento = subtotal - valor;
+                descuento = subtotal - valorAplicado;
                 if (descuento < 0) descuento = 0;
               });
               Navigator.pop(context);
@@ -721,6 +724,7 @@ class _DialogoPan extends StatefulWidget {
 
 class _DialogoPanState extends State<_DialogoPan> {
   final TextEditingController _valorCtrl = TextEditingController();
+  String _valorDigits = '';
 
   double precio = 0;
   double stock = 0;
@@ -730,8 +734,8 @@ class _DialogoPanState extends State<_DialogoPan> {
   @override
   void initState() {
     super.initState();
-    precio = double.tryParse(widget.producto['precio'].toString()) ?? 0;
-    stock = double.tryParse(widget.producto['stock'].toString()) ?? 0;;
+    precio = CurrencyUtils.parse(widget.producto['precio']);
+    stock = double.tryParse(widget.producto['stock'].toString()) ?? 0;
     _valorCtrl.text = '';
   }
 
@@ -741,21 +745,26 @@ class _DialogoPanState extends State<_DialogoPan> {
     });
   }
 
+  void _actualizarValorDesdeDigits() {
+    valor = CurrencyUtils.parse(_valorDigits);
+    _valorCtrl.text = _valorDigits.isEmpty
+        ? ''
+        : CurrencyUtils.formatControllerValue(valor);
+    _recalcularCantidad();
+  }
+
   void _agregarNumero(String n) {
     setState(() {
-      _valorCtrl.text += n;
-      valor = double.tryParse(_valorCtrl.text) ?? 0;
-      _recalcularCantidad();
+      _valorDigits += n;
+      _actualizarValorDesdeDigits();
     });
   }
 
   void _borrarNumero() {
     setState(() {
-      if (_valorCtrl.text.isNotEmpty) {
-        _valorCtrl.text =
-            _valorCtrl.text.substring(0, _valorCtrl.text.length - 1);
-        valor = double.tryParse(_valorCtrl.text) ?? 0;
-        _recalcularCantidad();
+      if (_valorDigits.isNotEmpty) {
+        _valorDigits = _valorDigits.substring(0, _valorDigits.length - 1);
+        _actualizarValorDesdeDigits();
       }
     });
   }
@@ -807,7 +816,7 @@ class _DialogoPanState extends State<_DialogoPan> {
                       textAlign: TextAlign.center,
                       decoration: const InputDecoration(
                         labelText: 'Valor a gastar',
-                        prefixText: '\$ ',
+                        hintText: '\$ 0',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -1068,7 +1077,7 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
   void _agregarNumero(String n) {
     setState(() {
       _efectivoCtrl.text += n;
-      pagaCon = double.tryParse(_efectivoCtrl.text) ?? 0;
+      pagaCon = CurrencyUtils.parse(_efectivoCtrl.text);
     });
   }
 
@@ -1078,17 +1087,12 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
         _efectivoCtrl.text =
             _efectivoCtrl.text.substring(0, _efectivoCtrl.text.length - 1);
 
-        pagaCon = double.tryParse(_efectivoCtrl.text) ?? 0;
+        pagaCon = CurrencyUtils.parse(_efectivoCtrl.text);
       }
     });
   }
 
-  double _toDouble(dynamic value) {
-    if (value == null) return 0;
-    if (value is double) return value;
-    if (value is int) return value.toDouble();
-    return double.tryParse(value.toString()) ?? 0;
-  }
+  double _toDouble(dynamic value) => CurrencyUtils.parse(value);
 
   void _actualizarDesdePorcentaje(String value) {
     if (_actualizandoPropina) return;
@@ -1101,7 +1105,7 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
     setState(() {
       propinaPorcentaje = porcentaje;
       propinaValor = nuevoValor;
-      _propinaValorCtrl.text = nuevoValor.toStringAsFixed(0);
+      _propinaValorCtrl.text = CurrencyUtils.formatControllerValue(nuevoValor);
     });
 
     _actualizandoPropina = false;
@@ -1112,7 +1116,7 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
 
     _actualizandoPropina = true;
 
-    final double valor = double.tryParse(value.replaceAll(',', '.')) ?? 0.0;
+    final double valor = CurrencyUtils.parse(value);
 
     final double porcentaje =
     widget.total > 0 ? (valor / widget.total) * 100 : 0.0;
@@ -1131,7 +1135,7 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
       propinaPorcentaje = 0;
       propinaValor = 0;
       _propinaPorcentajeCtrl.text = '0';
-      _propinaValorCtrl.text = '0';
+      _propinaValorCtrl.text = CurrencyUtils.formatControllerValue(0);
     });
   }
 
@@ -1551,9 +1555,10 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
           TextField(
             controller: _efectivoCtrl,
             keyboardType: TextInputType.number,
+            inputFormatters: const [ColombianCurrencyInputFormatter()],
             autofocus: true,
             decoration: InputDecoration(
-              prefixText: '\$ ',
+              hintText: '\$ 0',
               isDense: true,
               filled: true,
               fillColor: Colors.grey.shade50,
@@ -1563,7 +1568,7 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
             ),
             onChanged: (value) {
               setState(() {
-                pagaCon = double.tryParse(value) ?? 0;
+                pagaCon = CurrencyUtils.parse(value);
               });
             },
           ),
@@ -1572,7 +1577,7 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
 
           if (!digitoValor)
             Text(
-              'Total a pagar: \$${totalConPropina.toStringAsFixed(0)}',
+              'Total a pagar: ${CurrencyUtils.formatCop(totalConPropina)}',
               style: const TextStyle(
                 color: Color(0xFFc0733d),
                 fontWeight: FontWeight.bold,
@@ -1581,8 +1586,8 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
           else
             Text(
               cambio >= 0
-                  ? 'Cambio: \$${cambio.toStringAsFixed(0)}'
-                  : 'Faltan: \$${cambio.abs().toStringAsFixed(0)}',
+                  ? 'Cambio: ${CurrencyUtils.formatCop(cambio)}'
+                  : 'Faltan: ${CurrencyUtils.formatCop(cambio.abs())}',
               style: TextStyle(
                 color: cambio >= 0 ? Colors.green : Colors.red,
                 fontWeight: FontWeight.bold,
@@ -1641,7 +1646,7 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
                       ),
                     ),
                     Text(
-                      '\$${totalItem.toStringAsFixed(0)}',
+                      CurrencyUtils.formatCop(totalItem),
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
@@ -1691,9 +1696,10 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
                 child: TextField(
                   controller: _propinaValorCtrl,
                   keyboardType: TextInputType.number,
+                  inputFormatters: const [ColombianCurrencyInputFormatter()],
                   decoration: const InputDecoration(
                     labelText: 'Valor',
-                    prefixText: '\$ ',
+                    hintText: '\$ 0',
                     border: OutlineInputBorder(),
                     isDense: true,
                   ),
@@ -1732,7 +1738,7 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
                 ),
               ),
               Text(
-                '\$${totalConPropina.toStringAsFixed(0)}',
+                CurrencyUtils.formatCop(totalConPropina),
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 20,
@@ -1757,7 +1763,7 @@ class _ConfirmarVentaDialogState extends State<ConfirmarVentaDialog> {
             child: Text(label),
           ),
           Text(
-            '${negativo ? '-' : ''}\$${value.abs().toStringAsFixed(0)}',
+            CurrencyUtils.formatCop(value),
             style: TextStyle(
               fontWeight: FontWeight.w600,
               color: negativo ? Colors.red : Colors.black,
@@ -1849,7 +1855,7 @@ class _DialogoVentaFinalState extends State<DialogoVentaFinal> {
               ),
               const SizedBox(height: 6),
               Text(
-                '\$${widget.total.toStringAsFixed(0)}',
+                CurrencyUtils.formatCop(widget.total),
                 style: const TextStyle(
                   fontSize: 36,
                   fontWeight: FontWeight.bold,
@@ -1869,7 +1875,7 @@ class _DialogoVentaFinalState extends State<DialogoVentaFinal> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '\$${widget.cambio.toStringAsFixed(0)}',
+                  CurrencyUtils.formatCop(widget.cambio),
                   style: const TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,

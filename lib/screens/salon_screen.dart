@@ -9,6 +9,7 @@ import 'package:panaderia_nicol_pos/Services/ventas_service.dart';
 import 'package:panaderia_nicol_pos/screens/core/caja_activa.dart';
 import 'package:panaderia_nicol_pos/screens/core/usuario_activo.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:panaderia_nicol_pos/utils/currency_utils.dart';
 
 class SalonScreen extends StatefulWidget {
 
@@ -852,13 +853,13 @@ class _SalonScreenState extends State<SalonScreen> {
       final cliente = Map<String, dynamic>.from(result['cliente']);
       final String metodoPago = result['metodo_pago'];
       final double propina =
-          double.tryParse(result['propina_valor'].toString()) ?? 0;
+          CurrencyUtils.parse(result['propina_valor']);
 
       final double totalFinal =
-          double.tryParse(result['total_con_propina'].toString()) ?? total;
+          CurrencyUtils.parse(result['total_con_propina']) > 0 ? CurrencyUtils.parse(result['total_con_propina']) : total;
 
       final double pagaCon =
-          double.tryParse((result['paga_con'] ?? totalFinal).toString()) ?? totalFinal;
+          CurrencyUtils.parse(result['paga_con'] ?? totalFinal);
 
       final double cambio = metodoPago == 'efectivo'
           ? (pagaCon - totalFinal)

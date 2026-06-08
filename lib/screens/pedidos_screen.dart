@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/pedidos_service.dart';
 import '../widgets/productos_grid_widget.dart';
+import 'package:panaderia_nicol_pos/utils/currency_utils.dart';
 
 class PedidoScreen extends StatefulWidget {
   final int idMesa;
@@ -306,7 +307,7 @@ class _PedidoScreenState extends State<PedidoScreen> {
                           const Spacer(),
 
                           Text(
-                            "\$${(_toDouble(item["precio"]) * _toDouble(item["cantidad"])).toStringAsFixed(0)}",
+                            CurrencyUtils.formatCop(_toDouble(item["precio"]) * _toDouble(item["cantidad"])),
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                             ),
@@ -410,7 +411,7 @@ class _PedidoScreenState extends State<PedidoScreen> {
                 ),
               ),
               Text(
-                "\$${calcularTotal().toStringAsFixed(0)}",
+                CurrencyUtils.formatCop(calcularTotal()),
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,

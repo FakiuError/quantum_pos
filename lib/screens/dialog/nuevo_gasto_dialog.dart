@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:panaderia_nicol_pos/Services/gastos_service.dart';
+import 'package:panaderia_nicol_pos/utils/currency_utils.dart';
 
 class NuevoGastoDialog extends StatefulWidget {
   const NuevoGastoDialog({super.key});
@@ -56,11 +57,11 @@ class _NuevoGastoDialogState extends State<NuevoGastoDialog> {
               /// MONTO
               TextField(
                 controller: _montoCtrl,
-                keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: TextInputType.number,
+                inputFormatters: const [ColombianCurrencyInputFormatter()],
                 decoration: const InputDecoration(
                   labelText: 'Monto',
-                  prefixText: '\$ ',
+                  hintText: '\$ 0',
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -156,7 +157,7 @@ class _NuevoGastoDialogState extends State<NuevoGastoDialog> {
 
   Future<void> _guardar() async {
     final descripcion = _descCtrl.text.trim();
-    final monto = double.tryParse(_montoCtrl.text) ?? 0;
+    final monto = CurrencyUtils.parse(_montoCtrl.text);
 
     if (descripcion.isEmpty ||
         monto <= 0 ||

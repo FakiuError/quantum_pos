@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:panaderia_nicol_pos/Services/productos_service.dart';
+import 'package:panaderia_nicol_pos/utils/currency_utils.dart';
 
 class CrearProductoDialog extends StatefulWidget {
   final Map<String, dynamic>? producto;
@@ -45,8 +46,8 @@ class _CrearProductoDialogState extends State<CrearProductoDialog> {
       _codigoCtrl.text = p['codigo'] ?? '';
       _nombreCtrl.text = p['nombre'] ?? '';
       _stockCtrl.text = p['stock'].toString();
-      _precioCtrl.text = p['precio'].toString();
-      _precioCompraCtrl.text = p['precio_compra'].toString();
+      _precioCtrl.text = CurrencyUtils.formatControllerValue(p['precio']);
+      _precioCompraCtrl.text = CurrencyUtils.formatControllerValue(p['precio_compra']);
       _proveedorId = p['proveedor']?['id']?.toString();
       _categoriaId = p['categoria']?['id']?.toString();
     }
@@ -79,8 +80,8 @@ class _CrearProductoDialogState extends State<CrearProductoDialog> {
       codigo: _codigoCtrl.text.trim(),
       nombre: _nombreCtrl.text.trim(),
       stock: _stockCtrl.text,
-      precio: _precioCtrl.text,
-      precioCompra: _precioCompraCtrl.text,
+      precio: CurrencyUtils.toDatabaseString(_precioCtrl.text),
+      precioCompra: CurrencyUtils.toDatabaseString(_precioCompraCtrl.text),
       proveedorId: _proveedorId!,
       categoriaId: _categoriaId!,
       imagen: _imagen,
@@ -89,8 +90,8 @@ class _CrearProductoDialogState extends State<CrearProductoDialog> {
       codigo: _codigoCtrl.text.trim(),
       nombre: _nombreCtrl.text.trim(),
       stock: _stockCtrl.text,
-      precio: _precioCtrl.text,
-      precioCompra: _precioCompraCtrl.text,
+      precio: CurrencyUtils.toDatabaseString(_precioCtrl.text),
+      precioCompra: CurrencyUtils.toDatabaseString(_precioCompraCtrl.text),
       proveedorId: _proveedorId!,
       categoriaId: _categoriaId!,
       imagen: _imagen,
@@ -119,9 +120,9 @@ class _CrearProductoDialogState extends State<CrearProductoDialog> {
               _input(_codigoCtrl, 'Código'),
               _input(_nombreCtrl, 'Nombre'),
               _input(_stockCtrl, 'Stock', keyboard: TextInputType.number),
-              _input(_precioCtrl, 'Precio', keyboard: TextInputType.number),
+              _input(_precioCtrl, 'Precio', keyboard: TextInputType.number, money: true),
               _input(_precioCompraCtrl, 'Precio compra',
-                  keyboard: TextInputType.number),
+                  keyboard: TextInputType.number, money: true),
 
               _dropdown(
                 value: _proveedorId,
@@ -185,14 +186,23 @@ class _CrearProductoDialogState extends State<CrearProductoDialog> {
     );
   }
 
-  Widget _input(TextEditingController c, String label,
-      {TextInputType keyboard = TextInputType.text}) {
+  Widget _input(
+    TextEditingController c,
+    String label, {
+    TextInputType keyboard = TextInputType.text,
+    bool money = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
         controller: c,
-        keyboardType: keyboard,
-        decoration: InputDecoration(labelText: label),
+        keyboardType: money ? TextInputType.number : keyboard,
+        inputFormatters:
+            money ? const [ColombianCurrencyInputFormatter()] : null,
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: money ? '\$ 0' : null,
+        ),
       ),
     );
   }

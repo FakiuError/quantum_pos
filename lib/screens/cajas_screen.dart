@@ -9,6 +9,7 @@ import 'package:open_filex/open_filex.dart';
 import 'package:panaderia_nicol_pos/Services/reporte_caja_pdf_service.dart';
 import 'package:panaderia_nicol_pos/Services/ticket_venta_pdf_service.dart';
 import 'package:panaderia_nicol_pos/screens/core/esc_pos_service.dart';
+import 'package:panaderia_nicol_pos/utils/currency_utils.dart';
 
 class CajasScreen extends StatefulWidget {
   const CajasScreen({Key? key}) : super(key: key);
@@ -600,10 +601,7 @@ class _CajasScreenState extends State<CajasScreen> {
     );
   }
 
-  String _moneda(dynamic value) {
-    final n = double.tryParse(value.toString()) ?? 0;
-    return '\$ ${n.toStringAsFixed(0)}';
-  }
+  String _moneda(dynamic value) => CurrencyUtils.formatCop(value);
 
   Widget _buildMenuFlotante() {
     return Positioned(
@@ -836,11 +834,11 @@ class _CajasScreenState extends State<CajasScreen> {
                 _info('Empleado', c['empleado']),
                 _info('Fecha apertura', c['fecha_apertura']),
                 const SizedBox(height: 12),
-                _info('Base', c['saldo_base']),
-                _info('Efectivo', c['efectivo']),
-                _info('Bancolombia', c['bancolombia']),
-                _info('Nequi', c['nequi']),
-                _info('Daviplata', c['daviplata']),
+                _info('Base', c['saldo_base'], esMoneda: true),
+                _info('Efectivo', c['efectivo'], esMoneda: true),
+                _info('Bancolombia', c['bancolombia'], esMoneda: true),
+                _info('Nequi', c['nequi'], esMoneda: true),
+                _info('Daviplata', c['daviplata'], esMoneda: true),
               ],
             ),
           ),
@@ -1007,7 +1005,9 @@ class _CajasScreenState extends State<CajasScreen> {
   }
 
   // ───────────────── HELPERS ─────────────────
-  Widget _info(String label, dynamic value) {
+  Widget _info(String label, dynamic value, {bool esMoneda = false}) {
+    final texto = esMoneda ? _moneda(value) : (value?.toString() ?? '');
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
@@ -1023,7 +1023,7 @@ class _CajasScreenState extends State<CajasScreen> {
             ),
           ),
           Text(
-            value.toString(),
+            texto,
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
         ],
@@ -2166,10 +2166,7 @@ class _CajasFinalizadasDialogState extends State<_CajasFinalizadasDialog> {
 
   static String _texto(dynamic value) => value?.toString() ?? '';
 
-  static double _num(dynamic value) {
-    if (value is num) return value.toDouble();
-    return double.tryParse(_texto(value).replaceAll(',', '.')) ?? 0;
-  }
+  static double _num(dynamic value) => CurrencyUtils.parse(value);
 
   static String _cantidad(dynamic value) {
     final n = _num(value);
@@ -2222,7 +2219,7 @@ class _VentasCajaDialogState extends State<_VentasCajaDialog> {
     _totalVentasLocal = widget.ventas.fold<double>(
       0,
           (sum, venta) {
-        final total = double.tryParse(venta['total'].toString()) ?? 0;
+        final total = CurrencyUtils.parse(venta['total']);
         return sum + total;
       },
     );
@@ -2293,8 +2290,7 @@ class _VentasCajaDialogState extends State<_VentasCajaDialog> {
       );
 
       setState(() {
-        final totalAnulado =
-            double.tryParse(venta['total'].toString()) ?? 0;
+        final totalAnulado = CurrencyUtils.parse(venta['total']);
 
         _totalVentasLocal -= totalAnulado;
 
@@ -2369,8 +2365,7 @@ class _VentasCajaDialogState extends State<_VentasCajaDialog> {
     if (nuevaCantidad == null) return;
 
     final idDetalle = int.tryParse(detalle['id'].toString()) ?? 0;
-    final precioUnitario =
-        double.tryParse(detalle['precio_unitario'].toString()) ?? 0;
+    final precioUnitario = CurrencyUtils.parse(detalle['precio_unitario']);
 
     setState(() {
       detalle['cantidad'] = nuevaCantidad;
@@ -2396,8 +2391,7 @@ class _VentasCajaDialogState extends State<_VentasCajaDialog> {
       _cambiosDetalle[idDetalle] = {
         'id': idDetalle,
         'cantidad': double.tryParse(detalle['cantidad'].toString()) ?? 0,
-        'precio_unitario':
-        double.tryParse(detalle['precio_unitario'].toString()) ?? 0,
+        'precio_unitario': CurrencyUtils.parse(detalle['precio_unitario']),
         'eliminar': true,
       };
     });
@@ -2431,7 +2425,7 @@ class _VentasCajaDialogState extends State<_VentasCajaDialog> {
     }
 
     final propinaController = TextEditingController(
-      text: venta['propina'].toString(),
+      text: CurrencyUtils.formatControllerValue(venta['propina'] ?? 0),
     );
 
     final nuevaPropina = await showDialog<double>(
@@ -2440,9 +2434,11 @@ class _VentasCajaDialogState extends State<_VentasCajaDialog> {
         title: const Text('Actualizar propina'),
         content: TextField(
           controller: propinaController,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          keyboardType: TextInputType.number,
+          inputFormatters: const [ColombianCurrencyInputFormatter()],
           decoration: const InputDecoration(
             labelText: 'Propina',
+            hintText: '\$ 0',
             border: OutlineInputBorder(),
           ),
         ),
@@ -2453,9 +2449,7 @@ class _VentasCajaDialogState extends State<_VentasCajaDialog> {
           ),
           ElevatedButton(
             onPressed: () {
-              final value =
-                  double.tryParse(propinaController.text.replaceAll(',', '.')) ??
-                      0;
+              final value = CurrencyUtils.parse(propinaController.text);
               Navigator.pop(context, value);
             },
             child: const Text('Continuar'),
@@ -2788,7 +2782,7 @@ class _VentasCajaDialogState extends State<_VentasCajaDialog> {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            if ((double.tryParse(venta['propina'].toString()) ?? 0) > 0)
+                            if (CurrencyUtils.parse(venta['propina']) > 0)
                               Text(
                                 'Propina: ${widget.moneda(venta['propina'])}',
                                 style: const TextStyle(
@@ -3036,7 +3030,7 @@ class _GastosCajaDialogState extends State<_GastosCajaDialog> {
     _totalGastosLocal = widget.gastos.fold<double>(
       0,
           (sum, gasto) {
-        final monto = double.tryParse(gasto['monto'].toString()) ?? 0;
+        final monto = CurrencyUtils.parse(gasto['monto']);
         return sum + monto;
       },
     );
@@ -3114,7 +3108,7 @@ class _GastosCajaDialogState extends State<_GastosCajaDialog> {
       );
 
       setState(() {
-        final montoAnulado = double.tryParse(gasto['monto'].toString()) ?? 0;
+        final montoAnulado = CurrencyUtils.parse(gasto['monto']);
         _totalGastosLocal -= montoAnulado;
 
         if (_totalGastosLocal < 0) {

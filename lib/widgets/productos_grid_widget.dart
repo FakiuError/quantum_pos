@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:panaderia_nicol_pos/utils/currency_utils.dart';
 
 class ProductosGridWidget extends StatefulWidget {
 
@@ -187,7 +188,7 @@ class _ProductosGridWidgetState extends State<ProductosGridWidget>
 
                   /// PRECIO
                   Text(
-                    "\$${p['precio']}",
+                    CurrencyUtils.formatCop(p['precio']),
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       color: Colors.green,

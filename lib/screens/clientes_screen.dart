@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:panaderia_nicol_pos/Services/clientes_service.dart';
 import 'package:panaderia_nicol_pos/screens/dialog/crear_cliente_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:panaderia_nicol_pos/utils/currency_utils.dart';
 
 class ClientesScreen extends StatefulWidget {
   const ClientesScreen({super.key});
@@ -304,7 +305,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
             _Cell(_val(c['identificacion'])),
             _Cell(_val(c['telefono'])),
             _Cell(_val(c['correo'])),
-            _Cell('\$${c['deuda']}'),
+            _Cell(CurrencyUtils.formatCop(c['deuda'] ?? 0)),
             _Cell(
               activo ? 'Activo' : 'Eliminado',
               color: activo ? Colors.green : Colors.red,
@@ -469,9 +470,10 @@ class _DialogoAbonoState extends State<_DialogoAbono> {
           TextField(
             controller: _montoCtrl,
             keyboardType: TextInputType.number,
+            inputFormatters: const [ColombianCurrencyInputFormatter()],
             decoration: const InputDecoration(
               labelText: 'Monto',
-              prefixText: '\$ ',
+              hintText: '\$ 0',
             ),
           ),
 
@@ -504,7 +506,7 @@ class _DialogoAbonoState extends State<_DialogoAbono> {
 
         ElevatedButton(
           onPressed: () async {
-            final monto = double.tryParse(_montoCtrl.text) ?? 0;
+            final monto = CurrencyUtils.parse(_montoCtrl.text);
 
             if (monto <= 0) return;
 

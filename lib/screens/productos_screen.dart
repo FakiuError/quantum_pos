@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:panaderia_nicol_pos/Services/productos_service.dart';
 import 'package:panaderia_nicol_pos/screens/dialog/crear_producto_dialog.dart';
+import 'package:panaderia_nicol_pos/utils/currency_utils.dart';
 
 class ProductosScreen extends StatefulWidget {
   const ProductosScreen({super.key});
@@ -314,8 +315,8 @@ class _ProductosScreenState extends State<ProductosScreen> {
             _Cell(proveedorNombre),
             _Cell(categoriaNombre),
             _Cell(p['stock']?.toString() ?? '0'),
-            _Cell('\$${p['precio'] ?? 0}'),
-            _Cell('\$${p['precio_compra'] ?? 0}'),
+            _Cell(CurrencyUtils.formatCop(p['precio'] ?? 0)),
+            _Cell(CurrencyUtils.formatCop(p['precio_compra'] ?? 0)),
             _Cell(
               activo ? 'Activo' : 'Inactivo',
               color: activo ? Colors.green : Colors.red,

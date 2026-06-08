@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:panaderia_nicol_pos/Services/cajas_service.dart';
 import 'package:panaderia_nicol_pos/screens/core/usuario_activo.dart';
+import 'package:panaderia_nicol_pos/utils/currency_utils.dart';
 
 class CrearCajaDialog extends StatefulWidget {
   const CrearCajaDialog({Key? key}) : super(key: key);
@@ -10,10 +11,10 @@ class CrearCajaDialog extends StatefulWidget {
 }
 
 class _CrearCajaDialogState extends State<CrearCajaDialog> {
-  final _baseCtrl = TextEditingController(text: '0');
-  final _bancolombiaCtrl = TextEditingController(text: '0');
-  final _nequiCtrl = TextEditingController(text: '0');
-  final _daviplataCtrl = TextEditingController(text: '0');
+  final _baseCtrl = TextEditingController(text: CurrencyUtils.formatControllerValue(0));
+  final _bancolombiaCtrl = TextEditingController(text: CurrencyUtils.formatControllerValue(0));
+  final _nequiCtrl = TextEditingController(text: CurrencyUtils.formatControllerValue(0));
+  final _daviplataCtrl = TextEditingController(text: CurrencyUtils.formatControllerValue(0));
   final _obsCtrl = TextEditingController();
 
   bool _guardando = false;
@@ -24,10 +25,10 @@ class _CrearCajaDialogState extends State<CrearCajaDialog> {
 
     final ok = await _service.crearCaja(
       idEmpleado: UsuarioActivo().id!, // ✅ CAMBIO CLAVE
-      saldoBase: double.parse(_baseCtrl.text),
-      nequi: double.parse(_nequiCtrl.text),
-      daviplata: double.parse(_daviplataCtrl.text),
-      bancolombia: double.parse(_bancolombiaCtrl.text),
+      saldoBase: CurrencyUtils.parse(_baseCtrl.text),
+      nequi: CurrencyUtils.parse(_nequiCtrl.text),
+      daviplata: CurrencyUtils.parse(_daviplataCtrl.text),
+      bancolombia: CurrencyUtils.parse(_bancolombiaCtrl.text),
       observaciones: _obsCtrl.text,
     );
 
@@ -47,10 +48,10 @@ class _CrearCajaDialogState extends State<CrearCajaDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _input(_baseCtrl, 'Saldo base'),
-            _input(_bancolombiaCtrl, 'Bancolombia inicial'),
-            _input(_nequiCtrl, 'Nequi inicial'),
-            _input(_daviplataCtrl, 'Daviplata inicial'),
+            _input(_baseCtrl, 'Saldo base', money: true),
+            _input(_bancolombiaCtrl, 'Bancolombia inicial', money: true),
+            _input(_nequiCtrl, 'Nequi inicial', money: true),
+            _input(_daviplataCtrl, 'Daviplata inicial', money: true),
             _input(_obsCtrl, 'Observaciones'),
           ],
         ),
@@ -74,13 +75,18 @@ class _CrearCajaDialogState extends State<CrearCajaDialog> {
     );
   }
 
-  Widget _input(TextEditingController c, String label) {
+  Widget _input(TextEditingController c, String label, {bool money = false}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
         controller: c,
-        keyboardType: TextInputType.number,
-        decoration: InputDecoration(labelText: label),
+        keyboardType: money ? TextInputType.number : TextInputType.text,
+        inputFormatters:
+            money ? const [ColombianCurrencyInputFormatter()] : null,
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: money ? '\$ 0' : null,
+        ),
       ),
     );
   }
