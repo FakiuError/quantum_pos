@@ -177,6 +177,28 @@ class CajasService {
     }
   }
 
+  Future<Map<String, dynamic>> obtenerReporteCaja(int idCaja) async {
+    try {
+      final res = await http.get(
+        Uri.parse('$_baseUrl/caja_reporte.php?id_caja=$idCaja'),
+      );
+
+      if (res.statusCode != 200) {
+        return {
+          'success': false,
+          'error': 'Error HTTP ${res.statusCode}',
+        };
+      }
+
+      return jsonDecode(res.body);
+    } catch (e) {
+      return {
+        'success': false,
+        'error': 'Error al generar reporte de caja: $e',
+      };
+    }
+  }
+
   Future<Map<String, dynamic>> obtenerDetalleVenta(int idVenta) async {
     try {
       final res = await http.get(

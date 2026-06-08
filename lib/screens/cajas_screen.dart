@@ -7,6 +7,8 @@ import 'package:panaderia_nicol_pos/screens/dialog/nuevo_gasto_dialog.dart';
 import 'package:panaderia_nicol_pos/screens/core/usuario_activo.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:panaderia_nicol_pos/Services/reporte_caja_pdf_service.dart';
+import 'package:panaderia_nicol_pos/Services/ticket_venta_pdf_service.dart';
+import 'package:panaderia_nicol_pos/screens/core/esc_pos_service.dart';
 
 class CajasScreen extends StatefulWidget {
   const CajasScreen({Key? key}) : super(key: key);
@@ -536,35 +538,11 @@ class _CajasScreenState extends State<CajasScreen> {
 
     showDialog(
       context: context,
-      builder: (_) => _TablaCajaDialog(
-        titulo: 'Cajas finalizadas',
-        subtitulo: 'Histórico de cajas cerradas',
-        totalLabel: 'Cajas cerradas',
-        totalValor: cajas.length.toString(),
-        columnas: const [
-          'ID',
-          'Empleado',
-          'Apertura',
-          'Cierre',
-          'Base',
-          'Bancolombia',
-          'Ventas',
-          'Gastos',
-          'Resultado'
-        ],
-        filas: cajas.map((c) {
-          return [
-            c['id'].toString(),
-            c['empleado'].toString(),
-            c['fecha_apertura'].toString(),
-            c['fecha_cierre'].toString(),
-            _moneda(c['saldo_base']),
-            _moneda(c['saldo_final_bancolombia']),
-            _moneda(c['total_ventas']),
-            _moneda(c['total_gastos']),
-            _moneda(c['resultado']),
-          ];
-        }).toList(),
+      barrierDismissible: false,
+      builder: (_) => _CajasFinalizadasDialog(
+        cajas: cajas,
+        service: _service,
+        moneda: _moneda,
       ),
     );
   }
@@ -1054,147 +1032,313 @@ class _CajasScreenState extends State<CajasScreen> {
   }
 }
 
-class _TablaCajaDialog extends StatelessWidget {
-  final String titulo;
-  final String subtitulo;
-  final String totalLabel;
-  final String totalValor;
-  final List<String> columnas;
-  final List<List<String>> filas;
+class _CajasFinalizadasDialog extends StatefulWidget {
+  final List<Map<String, dynamic>> cajas;
+  final CajasService service;
+  final String Function(dynamic value) moneda;
 
-  const _TablaCajaDialog({
-    required this.titulo,
-    required this.subtitulo,
-    required this.totalLabel,
-    required this.totalValor,
-    required this.columnas,
-    required this.filas,
+  const _CajasFinalizadasDialog({
+    required this.cajas,
+    required this.service,
+    required this.moneda,
   });
+
+  @override
+  State<_CajasFinalizadasDialog> createState() => _CajasFinalizadasDialogState();
+}
+
+class _CajasFinalizadasDialogState extends State<_CajasFinalizadasDialog> {
+  Map<String, dynamic>? _cajaSeleccionada;
+  Map<String, dynamic>? _ventaSeleccionada;
+  Map<String, dynamic>? _gastoSeleccionado;
+
+  List<Map<String, dynamic>> _ventas = [];
+  List<Map<String, dynamic>> _gastos = [];
+  List<Map<String, dynamic>> _detallesVenta = [];
+
+  bool _cargandoMovimientos = false;
+  bool _cargandoDetalleVenta = false;
+  bool _generandoReporte = false;
+  bool _generandoTicketPdf = false;
+  bool _imprimiendoTicket = false;
+  String _vista = 'ventas';
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.cajas.isNotEmpty) {
+      Future.microtask(() => _seleccionarCaja(widget.cajas.first));
+    }
+  }
+
+  Future<void> _seleccionarCaja(Map<String, dynamic> caja) async {
+    setState(() {
+      _cajaSeleccionada = caja;
+      _ventaSeleccionada = null;
+      _gastoSeleccionado = null;
+      _detallesVenta = [];
+      _ventas = [];
+      _gastos = [];
+      _cargandoMovimientos = true;
+    });
+
+    final idCaja = int.tryParse(caja['id'].toString()) ?? 0;
+    final ventasRes = await widget.service.obtenerVentasPorCaja(idCaja);
+    final gastosRes = await widget.service.obtenerGastosPorCaja(idCaja);
+
+    if (!mounted) return;
+
+    final ventas = ventasRes['success'] == true && ventasRes['data'] is List
+        ? (ventasRes['data'] as List)
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList()
+        : <Map<String, dynamic>>[];
+
+    final gastos = gastosRes['success'] == true && gastosRes['data'] is List
+        ? (gastosRes['data'] as List)
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList()
+        : <Map<String, dynamic>>[];
+
+    setState(() {
+      _ventas = ventas;
+      _gastos = gastos;
+      _ventaSeleccionada = ventas.isNotEmpty ? ventas.first : null;
+      _gastoSeleccionado = gastos.isNotEmpty ? gastos.first : null;
+      _cargandoMovimientos = false;
+    });
+
+    if (_ventaSeleccionada != null) {
+      await _seleccionarVenta(_ventaSeleccionada!);
+    }
+  }
+
+  Future<void> _seleccionarVenta(Map<String, dynamic> venta) async {
+    setState(() {
+      _ventaSeleccionada = venta;
+      _detallesVenta = [];
+      _cargandoDetalleVenta = true;
+    });
+
+    final idVenta = int.tryParse(venta['id'].toString()) ?? 0;
+    final res = await widget.service.obtenerDetalleVenta(idVenta);
+
+    if (!mounted) return;
+
+    setState(() {
+      _detallesVenta = res['success'] == true && res['data'] is List
+          ? (res['data'] as List)
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList()
+          : <Map<String, dynamic>>[];
+      _cargandoDetalleVenta = false;
+    });
+  }
+
+  void _seleccionarGasto(Map<String, dynamic> gasto) {
+    setState(() => _gastoSeleccionado = gasto);
+  }
+
+  Future<List<Map<String, dynamic>>> _asegurarDetalleVenta() async {
+    final venta = _ventaSeleccionada;
+    if (venta == null) return [];
+
+    if (_detallesVenta.isNotEmpty && !_cargandoDetalleVenta) {
+      return _detallesVenta;
+    }
+
+    final idVenta = int.tryParse(venta['id'].toString()) ?? 0;
+    final res = await widget.service.obtenerDetalleVenta(idVenta);
+
+    if (!mounted) return [];
+
+    final detalles = res['success'] == true && res['data'] is List
+        ? (res['data'] as List)
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList()
+        : <Map<String, dynamic>>[];
+
+    setState(() {
+      _detallesVenta = detalles;
+      _cargandoDetalleVenta = false;
+    });
+
+    return detalles;
+  }
+
+  Future<void> _generarTicketPdf() async {
+    final venta = _ventaSeleccionada;
+    if (venta == null || _generandoTicketPdf) return;
+
+    setState(() => _generandoTicketPdf = true);
+
+    try {
+      final detalles = await _asegurarDetalleVenta();
+      if (detalles.isEmpty) {
+        _mostrarMensaje('La venta no tiene productos para generar el ticket');
+        return;
+      }
+
+      final ruta = await TicketVentaPdfService().generarTicketVentaPdf(
+        venta: venta,
+        detalles: detalles,
+      );
+
+      if (!mounted) return;
+      _mostrarMensaje('Ticket PDF generado correctamente', ok: true);
+      await OpenFilex.open(ruta);
+    } catch (e) {
+      if (!mounted) return;
+      _mostrarMensaje('No se pudo generar el ticket PDF: $e');
+    } finally {
+      if (mounted) setState(() => _generandoTicketPdf = false);
+    }
+  }
+
+  Future<void> _imprimirTicketFisico() async {
+    final venta = _ventaSeleccionada;
+    if (venta == null || _imprimiendoTicket) return;
+
+    final confirmado = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Imprimir ticket físico'),
+        content: Text('¿Seguro que deseas imprimir el ticket físico de la venta #${venta['id']}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFc0733d),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.print_rounded, size: 18),
+            label: const Text('Sí, imprimir'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmado != true) return;
+
+    setState(() => _imprimiendoTicket = true);
+
+    try {
+      final detalles = await _asegurarDetalleVenta();
+      if (detalles.isEmpty) {
+        _mostrarMensaje('La venta no tiene productos para imprimir');
+        return;
+      }
+
+      await EscPosService.imprimirTicket(
+        numeroFactura: int.tryParse(venta['id'].toString()) ?? 0,
+        cliente: _texto(venta['cliente']).isEmpty ? 'Consumidor final' : _texto(venta['cliente']),
+        identificacion: _texto(venta['identificacion']).isEmpty ? '222222222222' : _texto(venta['identificacion']),
+        usuario: _texto(venta['empleado']).isEmpty ? 'Sin empleado' : _texto(venta['empleado']),
+        fechaHora: _parseFecha(_texto(venta['fecha'])) ?? DateTime.now(),
+        subtotal: _num(venta['subtotal']),
+        descuento: _num(venta['descuento']),
+        propina: _num(venta['propina']),
+        total: _num(venta['total']),
+        cambio: 0,
+        items: detalles
+            .map(
+              (d) => {
+                'nombre': d['nombre'],
+                'cantidad': _num(d['cantidad']),
+                'precio': _num(d['precio_unitario']),
+              },
+            )
+            .toList(),
+      );
+
+      if (!mounted) return;
+      _mostrarMensaje('Ticket enviado a la impresora', ok: true);
+    } catch (e) {
+      if (!mounted) return;
+      _mostrarMensaje('No se pudo imprimir el ticket: $e');
+    } finally {
+      if (mounted) setState(() => _imprimiendoTicket = false);
+    }
+  }
+
+  Future<void> _generarReporteCaja(Map<String, dynamic> caja) async {
+    if (_generandoReporte) return;
+
+    setState(() => _generandoReporte = true);
+
+    try {
+      final idCaja = int.tryParse(caja['id'].toString()) ?? 0;
+      final res = await widget.service.obtenerReporteCaja(idCaja);
+
+      if (res['success'] != true) {
+        _mostrarMensaje(res['error'] ?? 'No se pudo consultar el reporte de caja');
+        return;
+      }
+
+      final reporte = res['reporte'] is Map
+          ? Map<String, dynamic>.from(res['reporte'])
+          : <String, dynamic>{};
+
+      final ruta = await ReporteCajaPdfService().generarReporteCajaDiario(reporte);
+
+      if (!mounted) return;
+      _mostrarMensaje('Reporte de caja generado correctamente', ok: true);
+      await OpenFilex.open(ruta);
+    } catch (e) {
+      if (!mounted) return;
+      _mostrarMensaje('No se pudo generar el reporte de caja: $e');
+    } finally {
+      if (mounted) setState(() => _generandoReporte = false);
+    }
+  }
+
+  void _mostrarMensaje(String mensaje, {bool ok = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(mensaje),
+        backgroundColor: ok ? Colors.green : Colors.red,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.white,
-      insetPadding: const EdgeInsets.all(32),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: SizedBox(
-        width: 1100,
-        height: 640,
+      insetPadding: const EdgeInsets.all(22),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.96,
+          maxHeight: MediaQuery.of(context).size.height * 0.90,
+          minWidth: 1120,
+          minHeight: 650,
+        ),
         child: Padding(
           padding: const EdgeInsets.all(22),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  const Icon(
-                    Icons.point_of_sale,
-                    color: Color(0xFFc0733d),
-                    size: 28,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          titulo,
-                          style: const TextStyle(
-                            fontSize: 21,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          subtitulo,
-                          style: const TextStyle(
-                            color: Colors.black54,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFc0733d).withOpacity(0.10),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '$totalLabel: $totalValor',
-                      style: const TextStyle(
-                        color: Color(0xFF7A4423),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  IconButton(
-                    tooltip: 'Cerrar',
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 20),
+              _buildHeader(),
+              const SizedBox(height: 16),
               const Divider(height: 1),
               const SizedBox(height: 16),
-
               Expanded(
-                child: filas.isEmpty
-                    ? const Center(
-                  child: Text(
-                    'No hay información para mostrar',
-                    style: TextStyle(color: Colors.black54),
-                  ),
-                )
-                    : Scrollbar(
-                  thumbVisibility: true,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: SingleChildScrollView(
-                      child: DataTable(
-                        headingRowColor: MaterialStateProperty.all(
-                          Colors.grey.shade100,
-                        ),
-                        columnSpacing: 28,
-                        headingTextStyle: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                        columns: columnas
-                            .map(
-                              (c) => DataColumn(
-                            label: Text(c),
-                          ),
-                        )
-                            .toList(),
-                        rows: filas
-                            .map(
-                              (fila) => DataRow(
-                            cells: fila
-                                .map(
-                                  (valor) => DataCell(
-                                Text(
-                                  valor,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            )
-                                .toList(),
-                          ),
-                        )
-                            .toList(),
-                      ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 405,
+                      child: _buildListadoCajas(),
                     ),
-                  ),
+                    const SizedBox(width: 18),
+                    Expanded(child: _buildPanelDerecho()),
+                  ],
                 ),
               ),
             ],
@@ -1203,7 +1347,843 @@ class _TablaCajaDialog extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildHeader() {
+    return Row(
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: const Color(0xFFc0733d).withOpacity(0.12),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Icon(Icons.inventory_2_outlined, color: Color(0xFFc0733d)),
+        ),
+        const SizedBox(width: 12),
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Cajas finalizadas',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 3),
+              Text(
+                'Selecciona una caja para consultar ventas, gastos, tickets y reportes.',
+                style: TextStyle(color: Colors.black54, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFc0733d).withOpacity(0.10),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            'Cajas cerradas: ${widget.cajas.length}',
+            style: const TextStyle(
+              color: Color(0xFF7A4423),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        IconButton(
+          tooltip: 'Cerrar',
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.close),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildListadoCajas() {
+    if (widget.cajas.isEmpty) {
+      return _emptyBox('No hay cajas finalizadas para mostrar');
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: const Text(
+              'Histórico de cajas',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.all(10),
+              itemCount: widget.cajas.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (_, index) {
+                final caja = widget.cajas[index];
+                final selected = _cajaSeleccionada?['id'].toString() == caja['id'].toString();
+                final observacion = _texto(caja['observaciones_apertura']).trim();
+                final observacionVisible = observacion.isEmpty
+                    ? 'Sin observación de apertura'
+                    : observacion;
+
+                return InkWell(
+                  borderRadius: BorderRadius.circular(15),
+                  onTap: () => _seleccionarCaja(caja),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    padding: const EdgeInsets.all(13),
+                    decoration: BoxDecoration(
+                      color: selected ? const Color(0xFFc0733d).withOpacity(0.10) : Colors.white,
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(
+                        color: selected ? const Color(0xFFc0733d) : Colors.grey.shade200,
+                        width: selected ? 1.4 : 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.035),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 19,
+                          backgroundColor: selected ? const Color(0xFFc0733d) : Colors.grey.shade200,
+                          child: Text(
+                            caja['id'].toString(),
+                            style: TextStyle(
+                              color: selected ? Colors.white : Colors.black87,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                caja['empleado'].toString(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 5),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: selected
+                                      ? const Color(0xFFc0733d).withOpacity(0.13)
+                                      : const Color(0xFF7A4423).withOpacity(0.07),
+                                  borderRadius: BorderRadius.circular(9),
+                                  border: Border.all(
+                                    color: const Color(0xFFc0733d).withOpacity(0.18),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.sticky_note_2_outlined,
+                                      size: 13,
+                                      color: Color(0xFF7A4423),
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Flexible(
+                                      child: Text(
+                                        observacionVisible,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Color(0xFF7A4423),
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                'Cierre: ${caja['fecha_cierre']}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.black54, fontSize: 12),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                'Ventas ${widget.moneda(caja['total_ventas'])}  •  Resultado ${widget.moneda(caja['resultado'])}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.black54, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Tooltip(
+                          message: 'Generar reporte PDF de esta caja',
+                          child: IconButton(
+                            visualDensity: VisualDensity.compact,
+                            onPressed: _generandoReporte ? null : () => _generarReporteCaja(caja),
+                            icon: _generandoReporte && selected
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.picture_as_pdf_outlined, color: Color(0xFFc0733d)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPanelDerecho() {
+    final caja = _cajaSeleccionada;
+
+    if (caja == null) {
+      return _emptyBox('Selecciona una caja finalizada');
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Caja #${caja['id']} - ${caja['empleado']}',
+                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Apertura: ${caja['fecha_apertura']}  •  Cierre: ${caja['fecha_cierre']}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.black54, fontSize: 12.5),
+                      ),
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.sticky_note_2_outlined,
+                            size: 14,
+                            color: Color(0xFF7A4423),
+                          ),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              'Observación: ${_texto(caja['observaciones_apertura']).trim().isEmpty ? 'Sin observación de apertura' : _texto(caja['observaciones_apertura']).trim()}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xFF7A4423),
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 14),
+                SizedBox(
+                  width: 180,
+                  child: DropdownButtonFormField<String>(
+                    value: _vista,
+                    decoration: InputDecoration(
+                      labelText: 'Ver información',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'ventas', child: Text('Ventas')),
+                      DropdownMenuItem(value: 'gastos', child: Text('Gastos')),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() => _vista = value);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFc0733d),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: _generandoReporte ? null : () => _generarReporteCaja(caja),
+                  icon: _generandoReporte
+                      ? const SizedBox(
+                          width: 17,
+                          height: 17,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.picture_as_pdf_outlined),
+                  label: const Text('Reporte PDF'),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: _cargandoMovimientos
+                ? const Center(child: CircularProgressIndicator())
+                : _vista == 'ventas'
+                    ? _buildVistaVentas()
+                    : _buildVistaGastos(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVistaVentas() {
+    if (_ventas.isEmpty) {
+      return _emptyBox('Esta caja no tiene ventas registradas');
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 6,
+            child: _buildListaVentasFinalizadas(),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            flex: 5,
+            child: _buildDetalleVentaFinalizada(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListaVentasFinalizadas() {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: [
+          _subHeader('Ventas de la caja', Icons.receipt_long_outlined),
+          Expanded(
+            child: ListView.separated(
+              itemCount: _ventas.length,
+              separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade200),
+              itemBuilder: (_, index) {
+                final venta = _ventas[index];
+                final selected = _ventaSeleccionada?['id'].toString() == venta['id'].toString();
+                return InkWell(
+                  onTap: () => _seleccionarVenta(venta),
+                  child: Container(
+                    color: selected ? const Color(0xFFc0733d).withOpacity(0.10) : Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundColor: selected ? const Color(0xFFc0733d) : Colors.grey.shade200,
+                          child: Text(
+                            venta['id'].toString(),
+                            style: TextStyle(
+                              color: selected ? Colors.white : Colors.black87,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                venta['cliente'].toString(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                '${venta['fecha']}  •  ${venta['metodo']}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.black54, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          widget.moneda(venta['total']),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetalleVentaFinalizada() {
+    final venta = _ventaSeleccionada;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        border: Border.all(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: [
+          _subHeader(
+            venta == null ? 'Detalle de venta' : 'Detalle venta #${venta['id']}',
+            Icons.manage_search_outlined,
+          ),
+          if (venta != null) ...[
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Expanded(child: _miniDato('Subtotal', widget.moneda(venta['subtotal']))),
+                  Expanded(child: _miniDato('Descuento', widget.moneda(venta['descuento'] ?? 0))),
+                  Expanded(child: _miniDato('Total', widget.moneda(venta['total']))),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF7A4423),
+                        side: const BorderSide(color: Color(0xFFc0733d)),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: _generandoTicketPdf ? null : _generarTicketPdf,
+                      icon: _generandoTicketPdf
+                          ? const SizedBox(width: 17, height: 17, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.picture_as_pdf_outlined),
+                      label: const Text('Ticket PDF'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFc0733d),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: _imprimiendoTicket ? null : _imprimirTicketFisico,
+                      icon: _imprimiendoTicket
+                          ? const SizedBox(
+                              width: 17,
+                              height: 17,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Icon(Icons.print_rounded),
+                      label: const Text('Ticket físico'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          Expanded(
+            child: venta == null
+                ? const Center(child: Text('Selecciona una venta', style: TextStyle(color: Colors.black54)))
+                : _cargandoDetalleVenta
+                    ? const Center(child: CircularProgressIndicator())
+                    : _detallesVenta.isEmpty
+                        ? const Center(child: Text('No hay productos registrados', style: TextStyle(color: Colors.black54)))
+                        : ListView.separated(
+                            padding: const EdgeInsets.all(14),
+                            itemCount: _detallesVenta.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 10),
+                            itemBuilder: (_, index) {
+                              final d = _detallesVenta[index];
+                              return Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.grey.shade200),
+                                ),
+                                child: Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 18,
+                                      backgroundColor: const Color(0xFF536DFE).withOpacity(0.12),
+                                      child: Text(
+                                        _cantidad(d['cantidad']),
+                                        style: const TextStyle(
+                                          color: Color(0xFF536DFE),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            d['nombre'].toString(),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(fontWeight: FontWeight.w600),
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            'Unitario: ${widget.moneda(d['precio_unitario'])}',
+                                            style: const TextStyle(color: Colors.black54, fontSize: 12),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Text(
+                                      widget.moneda(d['precio_total']),
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVistaGastos() {
+    if (_gastos.isEmpty) {
+      return _emptyBox('Esta caja no tiene gastos registrados');
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 6,
+            child: _buildListaGastosFinalizados(),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            flex: 5,
+            child: _buildDetalleGastoFinalizado(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListaGastosFinalizados() {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: [
+          _subHeader('Gastos de la caja', Icons.payments_outlined),
+          Expanded(
+            child: ListView.separated(
+              itemCount: _gastos.length,
+              separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade200),
+              itemBuilder: (_, index) {
+                final gasto = _gastos[index];
+                final selected = _gastoSeleccionado?['id'].toString() == gasto['id'].toString();
+                final esCaja = gasto['esCaja'].toString() == '1';
+                return InkWell(
+                  onTap: () => _seleccionarGasto(gasto),
+                  child: Container(
+                    color: selected ? const Color(0xFFc0733d).withOpacity(0.10) : Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundColor: selected ? const Color(0xFFc0733d) : Colors.grey.shade200,
+                          child: Text(
+                            gasto['id'].toString(),
+                            style: TextStyle(
+                              color: selected ? Colors.white : Colors.black87,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                gasto['descripcion'].toString(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                '${gasto['fecha_gasto']}  •  ${gasto['metodo']}  •  ${esCaja ? 'Sale de caja' : 'No caja'}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.black54, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          widget.moneda(gasto['monto']),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetalleGastoFinalizado() {
+    final gasto = _gastoSeleccionado;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        border: Border.all(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: [
+          _subHeader(
+            gasto == null ? 'Detalle de gasto' : 'Detalle gasto #${gasto['id']}',
+            Icons.manage_search_outlined,
+          ),
+          Expanded(
+            child: gasto == null
+                ? const Center(child: Text('Selecciona un gasto', style: TextStyle(color: Colors.black54)))
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(child: _miniDato('Método', gasto['metodo'].toString())),
+                            Expanded(child: _miniDato('Monto', widget.moneda(gasto['monto']))),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            Expanded(child: _miniDato('Fecha', gasto['fecha_gasto'].toString())),
+                            Expanded(child: _miniDato('Sale de caja', gasto['esCaja'].toString() == '1' ? 'Sí' : 'No')),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        const Text(
+                          'Descripción',
+                          style: TextStyle(
+                            color: Colors.black54,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: Text(
+                            gasto['descripcion'].toString(),
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        _detalleLinea('Empleado', gasto['empleado']),
+                      ],
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _subHeader(String titulo, IconData icon) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: const Color(0xFFc0733d)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              titulo,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _miniDato(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.black54, fontSize: 12)),
+        const SizedBox(height: 3),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
+
+  Widget _detalleLinea(String label, dynamic value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(
+              '$label:',
+              style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w500),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value?.toString() ?? '',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyBox(String mensaje) {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Text(
+        mensaje,
+        textAlign: TextAlign.center,
+        style: const TextStyle(color: Colors.black54),
+      ),
+    );
+  }
+
+  static String _texto(dynamic value) => value?.toString() ?? '';
+
+  static double _num(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(_texto(value).replaceAll(',', '.')) ?? 0;
+  }
+
+  static String _cantidad(dynamic value) {
+    final n = _num(value);
+    if (n == n.roundToDouble()) return n.round().toString();
+    return n.toStringAsFixed(2);
+  }
+
+  static DateTime? _parseFecha(String value) {
+    if (value.trim().isEmpty) return null;
+    return DateTime.tryParse(value.replaceFirst(' ', 'T'));
+  }
 }
+
+
 
 class _VentasCajaDialog extends StatefulWidget {
   final int idCaja;
