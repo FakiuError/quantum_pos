@@ -23,7 +23,6 @@ class CrearProductoDialog extends StatefulWidget {
 class _CrearProductoDialogState extends State<CrearProductoDialog> {
   final _codigoCtrl = TextEditingController();
   final _nombreCtrl = TextEditingController();
-  final _stockCtrl = TextEditingController();
   final _precioCtrl = TextEditingController();
   final _precioCompraCtrl = TextEditingController();
 
@@ -45,7 +44,6 @@ class _CrearProductoDialogState extends State<CrearProductoDialog> {
       final p = widget.producto!;
       _codigoCtrl.text = p['codigo'] ?? '';
       _nombreCtrl.text = p['nombre'] ?? '';
-      _stockCtrl.text = p['stock'].toString();
       _precioCtrl.text = CurrencyUtils.formatControllerValue(p['precio']);
       _precioCompraCtrl.text = CurrencyUtils.formatControllerValue(p['precio_compra']);
       _proveedorId = p['proveedor']?['id']?.toString();
@@ -79,7 +77,7 @@ class _CrearProductoDialogState extends State<CrearProductoDialog> {
       id: widget.producto!['id'],
       codigo: _codigoCtrl.text.trim(),
       nombre: _nombreCtrl.text.trim(),
-      stock: _stockCtrl.text,
+      stock: widget.producto?['stock']?.toString() ?? '0',
       precio: CurrencyUtils.toDatabaseString(_precioCtrl.text),
       precioCompra: CurrencyUtils.toDatabaseString(_precioCompraCtrl.text),
       proveedorId: _proveedorId!,
@@ -89,7 +87,7 @@ class _CrearProductoDialogState extends State<CrearProductoDialog> {
         : await _service.crearProducto(
       codigo: _codigoCtrl.text.trim(),
       nombre: _nombreCtrl.text.trim(),
-      stock: _stockCtrl.text,
+      stock: '0',
       precio: CurrencyUtils.toDatabaseString(_precioCtrl.text),
       precioCompra: CurrencyUtils.toDatabaseString(_precioCompraCtrl.text),
       proveedorId: _proveedorId!,
@@ -119,7 +117,10 @@ class _CrearProductoDialogState extends State<CrearProductoDialog> {
             children: [
               _input(_codigoCtrl, 'Código'),
               _input(_nombreCtrl, 'Nombre'),
-              _input(_stockCtrl, 'Stock', keyboard: TextInputType.number),
+              if (_esEdicion)
+                _stockSoloLectura(widget.producto?['stock'] ?? 0)
+              else
+                _avisoStockInicial(),
               _input(_precioCtrl, 'Precio', keyboard: TextInputType.number, money: true),
               _input(_precioCompraCtrl, 'Precio compra',
                   keyboard: TextInputType.number, money: true),
@@ -184,6 +185,82 @@ class _CrearProductoDialogState extends State<CrearProductoDialog> {
         ),
       ],
     );
+  }
+
+  Widget _stockSoloLectura(dynamic stock) {
+    final texto = _formatCantidad(stock);
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.inventory_2_outlined, size: 20, color: Color(0xFFc0733d)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Stock actual',
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+                Text(
+                  texto,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+          const Tooltip(
+            message: 'El stock se modifica solo con entradas o bajas de inventario.',
+            child: Icon(Icons.lock_outline, size: 18, color: Colors.black45),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _avisoStockInicial() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFc0733d).withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFc0733d).withOpacity(0.18)),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.info_outline, size: 20, color: Color(0xFFc0733d)),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'El producto se creará con stock 0. Para aumentar inventario usa Entradas a proveedor.',
+              style: TextStyle(fontSize: 12.5, color: Colors.black87),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatCantidad(dynamic value) {
+    final n = value is num
+        ? value.toDouble()
+        : double.tryParse(value?.toString().replaceAll(',', '.') ?? '') ?? 0;
+    if (n == n.roundToDouble()) return n.round().toString();
+    return n
+        .toStringAsFixed(3)
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
   }
 
   Widget _input(

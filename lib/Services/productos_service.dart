@@ -175,4 +175,45 @@ class ProductosService {
     return null;
   }
 
+
+  /// ───────────────── REGISTRAR BAJA DE PRODUCTO ─────────────────
+  Future<Map<String, dynamic>> registrarBajaProducto({
+    required int idProducto,
+    required int idCaja,
+    required int idEmpleado,
+    required double cantidad,
+    required String motivo,
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$_baseUrl/producto_baja_crear.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'id_producto': idProducto,
+          'id_caja': idCaja,
+          'id_empleado': idEmpleado,
+          'cantidad': cantidad,
+          'motivo': motivo,
+        }),
+      );
+
+      if (res.statusCode != 200 || res.body.isEmpty) {
+        return {
+          'success': false,
+          'error': 'No se recibió respuesta válida del servidor',
+        };
+      }
+
+      final data = jsonDecode(res.body);
+      return data is Map<String, dynamic>
+          ? data
+          : Map<String, dynamic>.from(data);
+    } catch (e) {
+      return {
+        'success': false,
+        'error': 'Error registrando baja: $e',
+      };
+    }
+  }
+
 }
